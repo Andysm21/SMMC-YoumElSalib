@@ -252,7 +252,7 @@ export default function EventWebsite() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#D4A484] via-[#E8C4A8] to-[#F5E6D3] text-gray-800">
-      {/* Header */}
+      {/* Header
       <motion.header
         initial={{ backgroundColor: "rgba(255, 255, 255, 0.8)" }}
         animate={isScrolled ? { backgroundColor: "rgba(255, 255, 255, 0.95)" } : { backgroundColor: "rgba(255, 255, 255, 0.8)" }}
@@ -273,7 +273,7 @@ export default function EventWebsite() {
             </Button>
           </div>
         </nav>
-      </motion.header>
+      </motion.header> */}
 
       {/* Hero Section */}
       {currentPage === "home" && (
@@ -296,20 +296,18 @@ export default function EventWebsite() {
                   transition={{ delay: 0.2 }}
                   className="relative"
                 >
-                  <div className="bg-white rounded-full p-6 shadow-xl">
-                    <Church className="h-16 w-16 text-[#D4AF37]" />
-                  </div>
+                  {/* <div className="bg-white rounded-full p-6 shadow-xl"> */}
+                  <img src="/ChurchLogo2.png" alt="St. Mary Church Zamalek Logo" className="h-70 w-70 object-contain" />
+                  {/* </div> */}
                 </motion.div>
-                <motion.div
+                {/* <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4 }}
                   className="relative"
                 >
-                  <div className="bg-white rounded-full p-6 shadow-xl">
-                    <Building2 className="h-16 w-16 text-[#8B4513]" />
-                  </div>
-                </motion.div>
+                  <img src="/ChurchLogo2.png" alt="St. Mary Church Zamalek Logo" className="h-70 w-70 object-contain" />
+                </motion.div> */}
               </div>
 
               {/* Title */}
@@ -561,22 +559,50 @@ export default function EventWebsite() {
                 <h2 className="text-4xl md:text-5xl font-bold text-[#8B4513] mb-4">About the Event</h2>
                 <p className="text-xl text-gray-600">A spiritual gathering at St Mary Maraashly Church</p>
               </div>
-
               <div className="bg-white rounded-2xl shadow-xl p-8 border border-[#D4AF37]/20">
                 <h3 className="text-2xl font-bold text-[#8B4513] mb-4">Event Description</h3>
+
+                {/* English */}
                 <p className="text-gray-700 leading-relaxed mb-6">
-                  Join us for a blessed spiritual journey hosted by Osret Sanawy at the beautiful St Mary Maraashly Church in Zamalek. 
-                  This special event brings together our community for worship, fellowship, and spiritual growth.
+                  Join us for a blessed and uplifting spiritual evening as we celebrate Youm El Salib (The Feast of the Cross), hosted by Osret Sanawy at St Mary Maraashly Church – Zamalek.
                 </p>
-                <p className="text-gray-700 leading-relaxed">
-                  Experience meaningful worship, inspiring messages, and connect with fellow believers in an atmosphere of grace and love. 
-                  All are welcome to join us for this memorable occasion.
+
+                <p className="text-gray-700 leading-relaxed mb-6">
+                  This special event brings together faith, creativity, and worship through a powerful program that includes live acting, choir performances, and heartfelt praise. Experience the story and meaning of the Cross in a way that touches the heart and strengthens the spirit.
+                </p>
+
+                <p className="text-gray-700 leading-relaxed mb-6">
+                  Come and be part of a joyful gathering filled with worship, fellowship, and the presence of God. Let us unite in faith, reflect on the depth of Christ’s love, and celebrate together in an atmosphere of grace and peace.
+                </p>
+
+                <p className="text-gray-700 mb-8 font-medium">
+                  ✨ All are welcome — we would love to have you with us.
+                </p>
+
+                {/* Separator */}
+                <div className="w-full h-px bg-[#D4AF37]/40 mb-8"></div>
+
+                {/* Arabic */}
+                <p className="text-gray-700 leading-relaxed mb-6 text-right" dir="rtl">
+                  انضموا إلينا في أمسية روحية مميزة ومليئة بالبركة للاحتفال بيوم الصليب، والتي تنظمها أسرة ثانوي في كنيسة العذراء مرياشلي – الزمالك.
+                </p>
+
+                <p className="text-gray-700 leading-relaxed mb-6 text-right" dir="rtl">
+                  يجمع هذا اللقاء بين الإيمان والإبداع من خلال برنامج متكامل يشمل تمثيلًا مؤثرًا، وكورالًا روحيًا، وتسبيحًا مليئًا بالمحبة، لنعيش معًا معنى الصليب بطريقة تمس القلب وتُقوّي الروح.
+                </p>
+
+                <p className="text-gray-700 leading-relaxed mb-6 text-right" dir="rtl">
+                  تعالوا لنقضي وقتًا مليئًا بالعبادة والشركة وحضور الله، حيث نتأمل في محبة المسيح العظيمة ونجدد حياتنا الروحية في جو من السلام والنعمة.
+                </p>
+
+                <p className="text-gray-700 text-right font-medium" dir="rtl">
+                  ✨ الدعوة مفتوحة للجميع — يسعدنا حضوركم ومشاركتكم معنا.
                 </p>
               </div>
 
               {/* Event Details Cards */}
               <div className="grid md:grid-cols-3 gap-6">
-                <Card className="bg-white/10 backdrop-blur-lg border-[#D4AF37]/30 hover:shadow-xl transition-shadow">
+                <Card className="bg-white/70 backdrop-blur-lg border-[#D4AF37]/30 hover:shadow-xl transition-shadow">
                   <CardContent className="p-6 text-center">
                     <Calendar className="w-12 h-12 text-[#D4AF37] mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-[#8B4513] mb-2">Date & Time</h3>
@@ -584,7 +610,7 @@ export default function EventWebsite() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white/10 backdrop-blur-lg border-[#D4AF37]/30 hover:shadow-xl transition-shadow">
+                <Card className="bg-white/70 backdrop-blur-lg border-[#D4AF37]/30 hover:shadow-xl transition-shadow">
                   <CardContent className="p-6 text-center">
                     <MapPin className="w-12 h-12 text-[#D4AF37] mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-[#8B4513] mb-2">Location</h3>
@@ -592,7 +618,7 @@ export default function EventWebsite() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white/10 backdrop-blur-lg border-[#D4AF37]/30 hover:shadow-xl transition-shadow">
+                <Card className="bg-white/70 backdrop-blur-lg border-[#D4AF37]/30 hover:shadow-xl transition-shadow">
                   <CardContent className="p-6 text-center">
                     <Church className="w-12 h-12 text-[#D4AF37] mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-[#8B4513] mb-2">Host</h3>
@@ -644,7 +670,7 @@ export default function EventWebsite() {
                 <h3 className="text-2xl font-bold mb-4">Stay Connected</h3>
                 <p className="text-white/90 mb-6">Follow us for updates and inspiration</p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <a
+                  {/* <a
                     href="https://www.tiktok.com/@osretsanawy"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -652,9 +678,9 @@ export default function EventWebsite() {
                   >
                     <Music className="h-5 w-5" />
                     TikTok Account
-                  </a>
+                  </a> */}
                   <a
-                    href="https://www.instagram.com/osretsanawy"
+                    href="https://www.instagram.com/youmelsalib.zamalek"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 bg-gradient-to-tr from-[#833AB4] via-[#FD1D1D] to-[#FCAF45] hover:opacity-90 text-white px-6 py-3 rounded-lg font-medium transition-opacity"
