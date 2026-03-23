@@ -317,7 +317,7 @@ export default function EventWebsite() {
                 transition={{ delay: 0.6 }}
                 className="text-5xl md:text-7xl font-bold text-[#8B4513] mb-4"
               >
-                A Spiritual Journey
+                Youm El Salib - يوم الصليب
               </motion.h1>
               
               <motion.p
