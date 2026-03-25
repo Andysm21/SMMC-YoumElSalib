@@ -32,13 +32,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate confirmation code in format: YMSLB#####
-    const randomNumbers = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
-    const confirmationCode = `YMSLB${randomNumbers}`;
-
     // Dynamically import to avoid build-time errors
     const { supabaseAdmin } = await import("@/lib/db");
     const { sendConfirmationEmail, sendWaitingListEmail } = await import("@/lib/email");
+
+    // Generate confirmation code
+    let confirmationCode = '';
+    let waitingListTurn: number | null = null;
+    let isConfirmed = false;
+    if (church === 'st-mary-maraashly') {
+      // Normal registration code
+      const randomNumbers = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+      confirmationCode = `YMSLB${randomNumbers}`;
+      isConfirmed = true; // Default confirmed for St Mary Maraashly
+    } else {
+      // Waiting list code: YLS_W#####
+      const { data: waitingList, error: waitingListError } = await supabaseAdmin
+        .from('registrations')
+        .select('id')
+        .eq('church_name', church)
+        .order('created_at', { ascending: true });
+      waitingListTurn = (waitingList?.length || 0) + 1;
+      const randomNumbers = waitingListTurn.toString().padStart(5, '0');
+      confirmationCode = `YSLB_W${randomNumbers}`;
+    }
 
     // Insert registration into database (using admin client to bypass RLS)
     const { data: insertedData, error: insertError } = await supabaseAdmin
@@ -50,8 +67,9 @@ export async function POST(request: NextRequest) {
           phone: phone,
           church_name: church,
           confirmation_code: confirmationCode,
-          is_confirmed: false,
+          is_confirmed: isConfirmed,
           email_sent: false,
+          waiting_list_turn: waitingListTurn,
         },
       ])
       .select();
@@ -64,8 +82,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send confirmation email if church matches "St Mary Maraashly Church", otherwise send waiting list email
-    if (church === "st-mary-maraashly") {
+  // Send confirmation email if church matches "St Mary Maraashly Church", otherwise send waiting list email
+  if (church === "st-mary-maraashly") {
       try {
         // Send email using the premium email service
         const emailResult = await sendConfirmationEmail(email, name, confirmationCode);
@@ -90,7 +108,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Send waiting list email for other churches
       try {
-        const emailResult = await sendWaitingListEmail(email, name, confirmationCode);
+  const emailResult = await sendWaitingListEmail(email, name, confirmationCode);
 
         // If email sent successfully, update the database
         if (emailResult.success) {

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, forwardRef } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import { MapPin, CalendarDays, CheckIcon, ArrowRightIcon, Church, User, Mail, Phone, Building2, Instagram, Music, ChevronDown, Calendar } from 'lucide-react';
 import VideoEmbed from "@/components/VideoEmbed";
@@ -137,7 +138,7 @@ export default function EventWebsite() {
     fullName: '',
     email: '',
     phone: '',
-    churchName: 'st-mary-maraashly',
+    churchName: '',
     otherChurch: '',
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -288,26 +289,17 @@ export default function EventWebsite() {
               transition={{ duration: 0.8 }}
               className="space-y-8"
             >
-              {/* Logos */}
-              <div className="flex justify-center items-center gap-8 mb-8">
+              {/* Poster and Logos */}
+              <div className="flex flex-col items-center gap-6 mb-8">
+                {/* Church Logo */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.2 }}
                   className="relative"
                 >
-                  {/* <div className="bg-white rounded-full p-6 shadow-xl"> */}
                   <img src="/ChurchLogo2.png" alt="St. Mary Church Zamalek Logo" className="h-70 w-70 object-contain" />
-                  {/* </div> */}
                 </motion.div>
-                {/* <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.4 }}
-                  className="relative"
-                >
-                  <img src="/ChurchLogo2.png" alt="St. Mary Church Zamalek Logo" className="h-70 w-70 object-contain" />
-                </motion.div> */}
               </div>
 
               {/* Title */}
@@ -326,7 +318,7 @@ export default function EventWebsite() {
                 transition={{ delay: 0.8 }}
                 className="text-xl md:text-2xl text-gray-600 mb-4"
               >
-                Hosted by Osret Sanawy
+                Hosted by Sunday School Family
               </motion.p>
 
               <motion.p
@@ -386,163 +378,180 @@ export default function EventWebsite() {
       {currentPage === "home" && (
         <section id="booking-section" className="relative min-h-screen flex items-center justify-center pt-24 pb-12 px-6">
           <BackgroundBeams className="opacity-20" />
-          
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative z-10 w-full max-w-md"
-          >
-            {!isSubmitted ? (
-              <div className="bg-white rounded-2xl shadow-2xl p-8 border border-[#D4AF37]/20">
-                <div className="text-center mb-8">
-                  <h2 className="text-3xl font-bold text-[#8B4513] mb-2">Book Your Spot</h2>
-                  <p className="text-gray-600">Fill in your details to register</p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  {submitError && (
-                    <div className="bg-red-100 border border-red-400 rounded-lg p-4">
-                      <p className="text-red-700">{submitError}</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <Label htmlFor="fullName">Full Name *</Label>
-                    <div className="relative mt-1">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="fullName"
-                        type="text"
-                        required
-                        placeholder="John Doe"
-                        value={formData.fullName}
-                        onChange={(e) => handleInputChange('fullName', e.target.value)}
-                        className="pl-10 bg-white text-gray-900"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    {errors.fullName && <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="email">Email *</Label>
-                    <div className="relative mt-1">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        required
-                        placeholder="john@example.com"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        className="pl-10 bg-white text-gray-900"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="phone">Phone Number *</Label>
-                    <div className="relative mt-1">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="phone"
-                        type="tel"
-                        required
-                        placeholder="+20 123 456 7890"
-                        value={formData.phone}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                        className="pl-10 bg-white text-gray-900"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="churchName">Church Name *</Label>
-                    <div className="relative mt-1">
-                      <Church className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
-                      <select
-                        id="churchName"
-                        required
-                        value={formData.churchName}
-                        onChange={(e) => handleInputChange('churchName', e.target.value)}
-                        disabled={isLoading}
-                        className="pl-10 w-full px-3 py-2 h-10 rounded-xl border border-input bg-white text-gray-900"
-                      >
-                        <option value="st-mary-maraashly">St Mary Maraashly Church</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    {errors.churchName && <p className="text-red-500 text-sm mt-1">{errors.churchName}</p>}
-                  </div>
-
-                  {formData.churchName === 'other' && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                    >
-                      <Label htmlFor="otherChurch">Please specify</Label>
-                      <Input
-                        id="otherChurch"
-                        type="text"
-                        required
-                        placeholder="Enter your church name"
-                        value={formData.otherChurch}
-                        onChange={(e) => handleInputChange('otherChurch', e.target.value)}
-                        className="mt-1 bg-white text-gray-900"
-                        disabled={isLoading}
-                      />
-                      {errors.otherChurch && <p className="text-red-500 text-sm mt-1">{errors.otherChurch}</p>}
-                    </motion.div>
-                  )}
-
-                  <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-                    {isLoading ? "Submitting..." : "Submit Registration"}
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setCurrentPage("home")}
-                    className="w-full text-[#8B4513] hover:bg-[#8B4513]/10"
-                  >
-                    Back to Home
-                  </Button>
-                </form>
-              </div>
-            ) : (
+          <div className="relative z-10 w-full flex flex-col md:flex-row gap-8 max-w-4xl items-center justify-center">
+            {/* Poster Side */}
+            <div className="w-full md:w-1/2 flex justify-center mb-8 md:mb-0">
+              <Image
+                src="/poster.jpg"
+                alt="Event Poster"
+                width={1000}
+                height={1200}
+                className="object-cover w-full max-w-xs rounded-2xl shadow-2xl border border-[#D4AF37]/30"
+                priority
+              />
+            </div>
+            {/* Booking Form Side */}
+            <div className="w-full md:w-1/2 flex justify-center">
               <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-2xl shadow-2xl p-12 text-center border border-[#D4AF37]/20"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-md"
               >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2, type: "spring" }}
-                  className="flex justify-center mb-6"
-                >
-                  <div className="bg-green-100 rounded-full p-4">
-                    <CheckIcon className="h-12 w-12 text-green-600" />
+                {isSubmitted ? (
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white rounded-2xl shadow-2xl p-12 text-center border border-[#D4AF37]/20"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2, type: "spring" }}
+                      className="flex justify-center mb-6"
+                    >
+                      <div className="bg-green-100 rounded-full p-4">
+                        <CheckIcon className="h-12 w-12 text-green-600" />
+                      </div>
+                    </motion.div>
+                    <h3 className="text-2xl font-bold text-[#8B4513] mb-4">Registration Successful!</h3>
+                    <p className="text-gray-600 mb-8">Thank you for booking your spot. We look forward to seeing you!</p>
+                    <div className="space-y-3">
+                      <Button onClick={resetForm} className="w-full">
+                        Register Another Person
+                      </Button>
+                      <Button variant="outline" onClick={() => { setCurrentPage("home"); resetForm(); }} className="w-full border-[#D4AF37] text-[#8B4513]">
+                        Back to Home
+                      </Button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <div className="bg-white rounded-2xl shadow-2xl p-8 border border-[#D4AF37]/20">
+                    <div className="text-center mb-8">
+                      <h2 className="text-3xl font-bold text-[#8B4513] mb-2">Book Your Spot</h2>
+                      <p className="text-gray-600">Fill in your details to register</p>
+                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      {submitError && (
+                        <div className="bg-red-100 border border-red-400 rounded-lg p-4">
+                          <p className="text-red-700">{submitError}</p>
+                        </div>
+                      )}
+
+                      <div>
+                        <Label htmlFor="fullName">Full Name *</Label>
+                        <div className="relative mt-1">
+                          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                          <Input
+                            id="fullName"
+                            type="text"
+                            required
+                            placeholder="John Doe"
+                            value={formData.fullName}
+                            onChange={(e) => handleInputChange('fullName', e.target.value)}
+                            className="pl-10 bg-white text-gray-900"
+                            disabled={isLoading}
+                          />
+                        </div>
+                        {errors.fullName && <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="email">Email *</Label>
+                        <div className="relative mt-1">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                          <Input
+                            id="email"
+                            type="email"
+                            required
+                            placeholder="john@example.com"
+                            value={formData.email}
+                            onChange={(e) => handleInputChange('email', e.target.value)}
+                            className="pl-10 bg-white text-gray-900"
+                            disabled={isLoading}
+                          />
+                        </div>
+                        {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="phone">Phone Number *</Label>
+                        <div className="relative mt-1">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                          <Input
+                            id="phone"
+                            type="tel"
+                            required
+                            placeholder="+20 123 456 7890"
+                            value={formData.phone}
+                            onChange={(e) => handleInputChange('phone', e.target.value)}
+                            className="pl-10 bg-white text-gray-900"
+                            disabled={isLoading}
+                          />
+                        </div>
+                        {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="churchName">Church Name *</Label>
+                        <div className="relative mt-1">
+                          <Church className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
+                          <select
+                            id="churchName"
+                            required
+                            value={formData.churchName}
+                            onChange={(e) => handleInputChange('churchName', e.target.value)}
+                            disabled={isLoading}
+                            className="pl-10 w-full px-3 py-2 h-10 rounded-xl border border-input bg-white text-gray-900"
+                          >
+                            <option value="" disabled>
+                              -- Please select a church --
+                            </option>
+                            <option value="st-mary-maraashly">St Mary Maraashly Church</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+                        {errors.churchName && <p className="text-red-500 text-sm mt-1">{errors.churchName}</p>}
+                      </div>
+
+                      {formData.churchName === 'other' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                        >
+                          <Label htmlFor="otherChurch">Please specify</Label>
+                          <Input
+                            id="otherChurch"
+                            type="text"
+                            required
+                            placeholder="Enter your church name"
+                            value={formData.otherChurch}
+                            onChange={(e) => handleInputChange('otherChurch', e.target.value)}
+                            className="mt-1 bg-white text-gray-900"
+                            disabled={isLoading}
+                          />
+                          {errors.otherChurch && <p className="text-red-500 text-sm mt-1">{errors.otherChurch}</p>}
+                        </motion.div>
+                      )}
+
+                      <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+                        {isLoading ? "Submitting..." : "Submit Registration"}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setCurrentPage("home")}
+                        className="w-full text-[#8B4513] hover:bg-[#8B4513]/10"
+                      >
+                        Back to Home
+                      </Button>
+                    </form>
                   </div>
-                </motion.div>
-                <h3 className="text-2xl font-bold text-[#8B4513] mb-4">Registration Successful!</h3>
-                <p className="text-gray-600 mb-8">Thank you for booking your spot. We look forward to seeing you!</p>
-                <div className="space-y-3">
-                  <Button onClick={resetForm} className="w-full">
-                    Register Another Person
-                  </Button>
-                  <Button variant="outline" onClick={() => { setCurrentPage("home"); resetForm(); }} className="w-full border-[#D4AF37] text-[#8B4513]">
-                    Back to Home
-                  </Button>
-                </div>
+                )}
               </motion.div>
-            )}
-          </motion.div>
+            </div>
+          </div>
         </section>
       )}
 
@@ -564,7 +573,7 @@ export default function EventWebsite() {
 
                 {/* English */}
                 <p className="text-gray-700 leading-relaxed mb-6">
-                  Join us for a blessed and uplifting spiritual evening as we celebrate Youm El Salib (The Feast of the Cross), hosted by Osret Sanawy at St Mary Maraashly Church – Zamalek.
+                  Join us for a blessed and uplifting spiritual evening as we celebrate Youm El Salib (The Feast of the Cross), hosted by Sunday School Family at St Mary Maraashly Church – Zamalek.
                 </p>
 
                 <p className="text-gray-700 leading-relaxed mb-6">
@@ -622,7 +631,7 @@ export default function EventWebsite() {
                   <CardContent className="p-6 text-center">
                     <Church className="w-12 h-12 text-[#D4AF37] mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-[#8B4513] mb-2">Host</h3>
-                    <p className="text-gray-700">Osret Sanawy</p>
+                    <p className="text-gray-700">Sunday School Family</p>
                   </CardContent>
                 </Card>
               </div>
@@ -704,7 +713,7 @@ export default function EventWebsite() {
       {/* Footer */}
       <footer className="relative bg-gradient-to-br from-[#8B4513] to-[#A0522D] text-white py-8 mt-auto">
         <div className="container mx-auto px-6 text-center">
-          <p className="text-sm">© 2024 Osret Sanawy - St Mary Maraashly Church. All rights reserved.</p>
+          <p className="text-sm">© 2024 Sunday School Family - St Mary Maraashly Church. All rights reserved.</p>
         </div>
       </footer>
     </div>

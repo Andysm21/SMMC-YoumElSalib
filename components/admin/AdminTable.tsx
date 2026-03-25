@@ -14,19 +14,29 @@ interface Registration {
   confirmation_code: string;
   email_sent: boolean;
   created_at: string;
+  waiting_list_turn?: number | null;
+  is_confirmed?: boolean;
 }
 
 interface AdminTableProps {
   registrations: Registration[];
   isLoading: boolean;
   error: string | null;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  onPageChange?: (page: number) => void;
 }
 
+
 export default function AdminTable({ registrations, isLoading, error }: AdminTableProps) {
+  // All hooks at the top, always called in the same order
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [adminKey, setAdminKey] = useState<string>("");
   const [showKeyInput, setShowKeyInput] = useState(false);
+  const [notifyingId, setNotifyingId] = useState<string | null>(null);
 
+  // Handlers must be defined before return
   const handleSendEmail = async (registration: Registration) => {
     if (!adminKey) {
       setShowKeyInput(true);
@@ -55,8 +65,6 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
 
       const data = await response.json();
       alert(`✅ Email sent successfully to ${registration.email}`);
-      
-      // Optionally refresh the page or update the UI
       window.location.reload();
     } catch (error) {
       console.error("Error sending email:", error);
@@ -65,6 +73,9 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
       setSendingEmail(null);
     }
   };
+
+
+  // Early returns after all hooks
   if (isLoading) {
     return (
       <Card className="bg-white/10 backdrop-blur-lg border-[#D4622A]/30">
@@ -104,6 +115,34 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
     );
   }
 
+  const handleNotifyAndConfirm = async (registration: Registration) => {
+    if (!adminKey) {
+      setShowKeyInput(true);
+      return;
+    }
+    setNotifyingId(registration.id);
+    try {
+      // Call a new API endpoint to send waiting list email and confirm
+      const response = await fetch("/api/admin/waiting-list-notify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({ registrationId: registration.id }),
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to notify: ${response.statusText}`);
+      }
+      alert(`✅ Notified and confirmed ${registration.full_name}`);
+      window.location.reload();
+    } catch (error) {
+      alert(`❌ Failed to notify: ${String(error)}`);
+    } finally {
+      setNotifyingId(null);
+    }
+  };
+
   return (
     <>
       {/* Admin Key Modal */}
@@ -142,20 +181,22 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
         </div>
       )}
 
-      <Card className="bg-white/10 backdrop-blur-lg border-[#D4622A]/30 overflow-hidden">
+      <Card className="bg-white/90 shadow-lg border-0 overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#D4622A]/20 bg-white/5">
-                  <th className="px-6 py-4 text-left text-white font-semibold">Name</th>
-                  <th className="px-6 py-4 text-left text-white font-semibold">Email</th>
-                  <th className="px-6 py-4 text-left text-white font-semibold">Phone</th>
-                  <th className="px-6 py-4 text-left text-white font-semibold">Church</th>
-                  <th className="px-6 py-4 text-left text-white font-semibold">Code</th>
-                  <th className="px-6 py-4 text-center text-white font-semibold">Email Sent</th>
-                  <th className="px-6 py-4 text-left text-white font-semibold">Date</th>
-                  <th className="px-6 py-4 text-center text-white font-semibold">Action</th>
+                <tr className="border-b border-[#e2c9b0] bg-[#f8f6f2]">
+                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Name</th>
+                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Email</th>
+                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Phone</th>
+                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Church</th>
+                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Code</th>
+                  <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Email Sent</th>
+                  <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Confirmed</th>
+                  <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Waiting List</th>
+                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Date</th>
+                  <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,32 +206,42 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.05 }}
-                    className="border-b border-[#D4622A]/10 hover:bg-white/5 transition-colors duration-200"
+                    className="border-b border-[#e2c9b0] hover:bg-[#f3e9e0]/60 transition-colors duration-200"
                   >
-                    <td className="px-6 py-4 text-white">{registration.full_name}</td>
-                    <td className="px-6 py-4 text-white/80 text-sm">{registration.email}</td>
-                    <td className="px-6 py-4 text-white/80 text-sm">{registration.phone}</td>
-                    <td className="px-6 py-4 text-white/80 text-sm">{registration.church_name}</td>
-                    <td className="px-6 py-4 text-[#E8B4A0] font-mono text-sm font-semibold">
-                      {registration.confirmation_code}
-                    </td>
+                    <td className="px-6 py-4 text-[#3d2a13] font-medium">{registration.full_name}</td>
+                    <td className="px-6 py-4 text-[#7a5c3e] text-sm">{registration.email}</td>
+                    <td className="px-6 py-4 text-[#7a5c3e] text-sm">{registration.phone}</td>
+                    <td className="px-6 py-4 text-[#7a5c3e] text-sm">{registration.church_name}</td>
+                    <td className="px-6 py-4 text-[#D4622A] font-mono text-sm font-semibold">{registration.confirmation_code}</td>
                     <td className="px-6 py-4 text-center">
                       {registration.email_sent ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-400 mx-auto" />
+                        <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
                       ) : (
                         <XCircle className="w-5 h-5 text-red-400 mx-auto" />
                       )}
                     </td>
-                    <td className="px-6 py-4 text-white/70 text-sm">
-                      {new Date(registration.created_at).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <td className="px-6 py-4 text-center">
+                      {registration.is_confirmed ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-400 mx-auto" />
+                      )}
                     </td>
                     <td className="px-6 py-4 text-center">
+                      {registration.waiting_list_turn != null ? (
+                        <span className="text-yellow-600 font-bold">#{registration.waiting_list_turn}</span>
+                      ) : (
+                        <span className="text-[#bfa98c]">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-[#7a5c3e] text-sm">
+                      {(() => {
+                        const d = new Date(registration.created_at);
+                        const pad = (n: number) => n.toString().padStart(2, '0');
+                        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 text-center flex flex-col gap-2 items-center">
                       <button
                         onClick={() => handleSendEmail(registration)}
                         disabled={sendingEmail === registration.id || registration.email_sent}
@@ -198,7 +249,7 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
                           sendingEmail === registration.id
                             ? "bg-[#D4622A]/50 text-white/50 cursor-not-allowed"
                             : registration.email_sent
-                            ? "bg-green-500/30 text-green-300 cursor-default"
+                            ? "bg-green-500/30 text-green-700 cursor-default"
                             : "bg-[#D4622A] text-white hover:bg-[#B84F1E]"
                         }`}
                       >
@@ -211,6 +262,20 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
                         )}
                         {sendingEmail === registration.id ? "Sending..." : registration.email_sent ? "Sent" : "Send"}
                       </button>
+                      {registration.waiting_list_turn != null && !registration.is_confirmed && (
+                        <button
+                          onClick={() => handleNotifyAndConfirm(registration)}
+                          disabled={notifyingId === registration.id}
+                          className={`px-3 py-2 rounded-lg flex items-center justify-center gap-2 transition ${
+                            notifyingId === registration.id
+                              ? "bg-yellow-500/50 text-white/50 cursor-not-allowed"
+                              : "bg-yellow-500 text-white hover:bg-yellow-600"}
+                        `}
+                        >
+                          {notifyingId === registration.id ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                          {notifyingId === registration.id ? "Notifying..." : "Notify & Confirm"}
+                        </button>
+                      )}
                     </td>
                   </motion.tr>
                 ))}

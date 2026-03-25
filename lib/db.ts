@@ -30,4 +30,5 @@ export type Registration = {
   is_confirmed: boolean
   email_sent: boolean
   created_at: string
+  waiting_list_turn?: number | null // null if not on waiting list, number if on waiting list
 }

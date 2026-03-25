@@ -37,25 +37,26 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1A0F08] to-[#2A1810] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#f8f6f2] via-[#f3e9e0] to-[#f8f6f2]">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        <Card className="bg-white/10 backdrop-blur-lg border-[#D4622A]/30">
-          <CardContent className="p-8">
+        <Card className="bg-white/90 shadow-2xl border-0 rounded-2xl">
+          <CardContent className="p-10">
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.5 }}
               className="text-center mb-8"
             >
-              <h1 className="text-4xl font-black text-[#1A0F08] mb-2" style={{ fontFamily: "Georgia, serif" }}>
+              <img src="/poster.jpg" alt="Event Logo" className="mx-auto mb-4 w-20 h-20 rounded-full shadow-lg border-4 border-[#D4622A]/30 object-cover bg-white" />
+              <h1 className="text-4xl font-black text-[#D4622A] mb-2 tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>
                 Admin Login
               </h1>
-              <p className="text-white/70">Access the event management dashboard</p>
+              <p className="text-[#7a5c3e] text-base">Access the event management dashboard</p>
             </motion.div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -63,14 +64,14 @@ export default function LoginForm() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-red-500/20 border border-red-500/50 rounded-lg p-4"
+                  className="bg-red-100 border border-red-300 rounded-lg p-4"
                 >
-                  <p className="text-red-200 text-sm">{error}</p>
+                  <p className="text-red-700 text-sm">{error}</p>
                 </motion.div>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-white">
+                <Label htmlFor="username" className="text-[#7a5c3e] font-semibold">
                   Username
                 </Label>
                 <Input
@@ -80,12 +81,12 @@ export default function LoginForm() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={isLoading}
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white focus:border-[#D4622A] disabled:opacity-50"
+                  className="bg-[#f8f6f2] border-[#e2c9b0] text-[#7a5c3e] placeholder:text-[#bfa98c] focus:border-[#D4622A] disabled:opacity-50"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-white">
+                <Label htmlFor="password" className="text-[#7a5c3e] font-semibold">
                   Password
                 </Label>
                 <Input
@@ -95,14 +96,14 @@ export default function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white focus:border-[#D4622A] disabled:opacity-50"
+                  className="bg-[#f8f6f2] border-[#e2c9b0] text-[#7a5c3e] placeholder:text-[#bfa98c] focus:border-[#D4622A] disabled:opacity-50"
                 />
               </div>
 
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[#D4622A] hover:bg-[#B84F1E] text-white py-6 text-lg rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white py-4 text-lg rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
