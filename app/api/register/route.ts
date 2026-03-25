@@ -46,15 +46,14 @@ export async function POST(request: NextRequest) {
       confirmationCode = `YMSLB${randomNumbers}`;
       isConfirmed = true; // Default confirmed for St Mary Maraashly
     } else {
-      // Waiting list code: YLS_W#####
+      // Waiting list code: YLS_W##### (global incremental)
       const { data: waitingList, error: waitingListError } = await supabaseAdmin
         .from('registrations')
         .select('id')
-        .eq('church_name', church)
-        .order('created_at', { ascending: true });
+        .not('waiting_list_turn', 'is', null);
       waitingListTurn = (waitingList?.length || 0) + 1;
-      const randomNumbers = waitingListTurn.toString().padStart(5, '0');
-      confirmationCode = `YSLB_W${randomNumbers}`;
+      const regNum = waitingListTurn.toString().padStart(5, '0');
+      confirmationCode = `YSLB_W${regNum}`;
     }
 
     // Insert registration into database (using admin client to bypass RLS)
