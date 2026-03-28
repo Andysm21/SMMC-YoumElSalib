@@ -36,11 +36,19 @@ export async function POST(request: NextRequest) {
     const { supabaseAdmin } = await import("@/lib/db");
     const { sendConfirmationEmail, sendWaitingListEmail } = await import("@/lib/email");
 
-    // Generate confirmation code
+    // Check total registrations (not waiting list)
+    const { data: allRegs, error: allRegsError } = await supabaseAdmin
+      .from('registrations')
+      .select('id')
+      .is('waiting_list_turn', null);
+    const totalConfirmed = allRegs?.length || 0;
+
     let confirmationCode = '';
     let waitingListTurn: number | null = null;
     let isConfirmed = false;
-    if (church === 'st-mary-maraashly') {
+    const forceWaitingList = totalConfirmed >= 170;
+
+    if (church === 'st-mary-maraashly' && !forceWaitingList) {
       // Normal registration code
       const randomNumbers = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
       confirmationCode = `YMSLB${randomNumbers}`;

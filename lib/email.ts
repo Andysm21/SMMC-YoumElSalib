@@ -214,7 +214,7 @@ function generatePremiumConfirmationHTML(
                             </p>
                             <!-- Poster Image -->
                             <div style="margin: 30px 0; text-align: center; border-radius: 8px; overflow: hidden;">
-                              <img src="https://drive.google.com/u/0/drive-viewer/AKGpihbGPW22gCQhHAXTyoTDaRPJ-yPU14Ipj8Y8-0SRRAwz8IQrsB357pEirO9MIcwfIw4ahgzbamMOgt8Bo3vPRbXFRniCTPtY4g=s1600-rw-v1?auditContext=forDisplay" alt="Youm El Salib Poster" style="width: 100%; height: auto; max-width: 300px; display: block; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+                              <img src="https://drive.google.com/u/0/drive-viewer/AKGpihZCKbmkthtEz7oDbafx-77HTmt9rmMM696Jr5jC1GejliVRWl3at1BdIy-Wzy8rC2C9IU8nqmpjXYUGUO4eK2ZEg9bac9rGqA=s1600-rw-v1?auditContext=forDisplay" alt="Youm El Salib Poster" style="width: 100%; height: auto; max-width: 300px; display: block; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
                             </div>
                             <table role="presentation" width="100%" style="margin: 30px 0; border: 2px solid #D4622A; border-radius: 8px; overflow: hidden;">
                         <tr style="background-color: #F5E6D3;">
