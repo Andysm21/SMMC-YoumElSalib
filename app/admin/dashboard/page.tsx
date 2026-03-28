@@ -7,7 +7,8 @@ import { getSession, clearSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import AdminTable from "@/components/admin/AdminTable";
-import { LogOut, Users } from "lucide-react";
+import RegistrationStatusModal from "@/components/admin/RegistrationStatusModal";
+import { LogOut, Users, Pause, Play } from "lucide-react";
 
 interface Registration {
   id: string;
@@ -31,6 +32,18 @@ export default function AdminDashboard() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
+  const [totalStats, setTotalStats] = useState({
+    totalRegistrations: 0,
+    totalEmailsSent: 0,
+    totalConfirmed: 0,
+    totalWaitingList: 0,
+  });
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [registrationStatus, setRegistrationStatus] = useState({
+    is_open: true,
+    message: "",
+  });
+  const [adminKey, setAdminKey] = useState<string>("");
 
   useEffect(() => {
     if (!getSession()) {
@@ -38,8 +51,68 @@ export default function AdminDashboard() {
       return;
     }
     fetchRegistrations();
+    fetchTotalStats();
+    fetchRegistrationStatus();
     // eslint-disable-next-line
   }, [router, waitingListOnly, confirmedFilter, search, page]);
+
+  const fetchRegistrationStatus = async () => {
+    try {
+      const response = await fetch("/api/admin/registration-status");
+      if (response.ok) {
+        const data = await response.json();
+        setRegistrationStatus(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch registration status:", err);
+    }
+  };
+
+  const handleUpdateRegistrationStatus = async (is_open: boolean, message: string) => {
+    if (!adminKey) {
+      throw new Error("Admin key is required. Please enter it and try again.");
+    }
+
+    try {
+      const response = await fetch("/api/admin/registration-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({ is_open, message }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update registration status");
+      }
+
+      const data = await response.json();
+      setRegistrationStatus(data);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const fetchTotalStats = async () => {
+    try {
+      // Fetch all stats without filters to get totals
+      const response = await fetch(`/api/admin/registrations?page=1&pageSize=1`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Get total counts by fetching stats
+        const statsResponse = await fetch(`/api/admin/stats`);
+        const statsData = await statsResponse.json();
+        
+        if (statsResponse.ok) {
+          setTotalStats(statsData);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    }
+  };
 
   const fetchRegistrations = async () => {
     setIsLoading(true);
@@ -90,13 +163,45 @@ export default function AdminDashboard() {
               <p className="text-[#7a5c3e] text-base">Event Registration Management</p>
             </div>
           </div>
-          <Button
-            onClick={handleLogout}
-            className="bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white py-3 px-8 rounded-xl font-bold shadow-md transition-all duration-300"
-          >
-            <LogOut className="w-5 h-5" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (!adminKey) {
+                  const key = prompt("Enter Admin Secret Key:");
+                  if (key) {
+                    setAdminKey(key);
+                    setShowStatusModal(true);
+                  }
+                } else {
+                  setShowStatusModal(true);
+                }
+              }}
+              className={`flex items-center gap-2 py-3 px-6 rounded-xl font-bold shadow-md transition-all duration-300 ${
+                registrationStatus.is_open
+                  ? "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                  : "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white"
+              }`}
+            >
+              {registrationStatus.is_open ? (
+                <>
+                  <Play className="w-5 h-5" />
+                  Registrations Open
+                </>
+              ) : (
+                <>
+                  <Pause className="w-5 h-5" />
+                  Registrations Paused
+                </>
+              )}
+            </button>
+            <Button
+              onClick={handleLogout}
+              className="bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white py-3 px-8 rounded-xl font-bold shadow-md transition-all duration-300"
+            >
+              <LogOut className="w-5 h-5" />
+              Logout
+            </Button>
+          </div>
         </motion.div>
 
         {/* Stats Cards */}
@@ -104,29 +209,57 @@ export default function AdminDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid md:grid-cols-2 gap-8 mb-10"
+          className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
         >
           <Card className="bg-gradient-to-br from-[#fff7ef] to-[#f3e9e0] border-0 shadow-lg">
-            <CardContent className="p-8 flex items-center gap-6">
-              <div className="bg-[#D4622A]/10 rounded-xl p-5">
-                <Users className="w-10 h-10 text-[#D4622A]" />
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-[#D4622A]/10 rounded-xl p-4">
+                <Users className="w-8 h-8 text-[#D4622A]" />
               </div>
               <div>
-                <p className="text-[#7a5c3e] text-lg font-semibold">Total Registrations</p>
-                <p className="text-5xl font-extrabold text-[#D4622A]">{registrations.length}</p>
+                <p className="text-[#7a5c3e] text-sm font-semibold">Total Registrations</p>
+                <p className="text-4xl font-extrabold text-[#D4622A]">{totalStats.totalRegistrations}</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-[#f3e9e0] to-[#fff7ef] border-0 shadow-lg">
-            <CardContent className="p-8 flex items-center gap-6">
-              <div className="bg-green-500/10 rounded-xl p-5">
-                <Users className="w-10 h-10 text-green-500" />
+          <Card className="bg-gradient-to-br from-[#f0f9ff] to-[#e0f2fe] border-0 shadow-lg">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-blue-500/10 rounded-xl p-4">
+                <Users className="w-8 h-8 text-blue-500" />
               </div>
               <div>
-                <p className="text-[#7a5c3e] text-lg font-semibold">Emails Sent</p>
-                <p className="text-5xl font-extrabold text-green-600">
-                  {registrations.filter((r) => r.email_sent).length}
+                <p className="text-[#7a5c3e] text-sm font-semibold">Emails Sent</p>
+                <p className="text-4xl font-extrabold text-blue-600">
+                  {totalStats.totalEmailsSent}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border-0 shadow-lg">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-green-500/10 rounded-xl p-4">
+                <Users className="w-8 h-8 text-green-500" />
+              </div>
+              <div>
+                <p className="text-[#7a5c3e] text-sm font-semibold">Confirmed</p>
+                <p className="text-4xl font-extrabold text-green-600">
+                  {totalStats.totalConfirmed}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-[#fef3c7] to-[#fde68a] border-0 shadow-lg">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-yellow-500/10 rounded-xl p-4">
+                <Users className="w-8 h-8 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-[#7a5c3e] text-sm font-semibold">Waiting List</p>
+                <p className="text-4xl font-extrabold text-yellow-600">
+                  {totalStats.totalWaitingList}
                 </p>
               </div>
             </CardContent>
@@ -189,7 +322,9 @@ export default function AdminDashboard() {
               disabled={page === 1}
               className="px-5 py-3 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] text-white rounded-l-xl font-bold disabled:bg-gray-300 disabled:text-gray-500"
             >Prev</button>
-            <span className="px-5 py-3 bg-[#f8f6f2] text-[#7a5c3e] border-t border-b border-[#e2c9b0]">Page {page}</span>
+            <span className="px-5 py-3 bg-[#f8f6f2] text-[#7a5c3e] border-t border-b border-[#e2c9b0]">
+              Page {page} of {Math.ceil(total / pageSize) || 1}
+            </span>
             <button
               onClick={() => setPage(page + 1)}
               disabled={registrations.length < pageSize}
@@ -197,6 +332,14 @@ export default function AdminDashboard() {
             >Next</button>
           </div>
         </motion.div>
+
+        {/* Registration Status Modal */}
+        <RegistrationStatusModal
+          isOpen={showStatusModal}
+          onClose={() => setShowStatusModal(false)}
+          currentStatus={registrationStatus}
+          onStatusChange={handleUpdateRegistrationStatus}
+        />
       </div>
     </div>
   );

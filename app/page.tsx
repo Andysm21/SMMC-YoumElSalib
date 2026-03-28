@@ -148,11 +148,31 @@ export default function EventWebsite() {
   const [submitError, setSubmitError] = useState("");
   const [errors, setErrors] = useState<Partial<FormData>>({});
   const [isScrolled, setIsScrolled] = useState(false);
+  const [registrationStatus, setRegistrationStatus] = useState({
+    is_open: true,
+    message: "",
+  });
 
   const { scrollY } = useScroll();
   useMotionValueEvent(scrollY, "change", (latest) => {
     setIsScrolled(latest > 10);
   });
+
+  React.useEffect(() => {
+    // Fetch registration status
+    const fetchStatus = async () => {
+      try {
+        const response = await fetch("/api/admin/registration-status");
+        if (response.ok) {
+          const data = await response.json();
+          setRegistrationStatus(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch registration status:", error);
+      }
+    };
+    fetchStatus();
+  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {};
@@ -438,12 +458,21 @@ export default function EventWebsite() {
                       <h2 className="text-3xl font-bold text-[#8B4513] mb-2">Book Your Spot</h2>
                       <p className="text-gray-600">Fill in your details to register</p>
                     </div>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      {submitError && (
-                        <div className="bg-red-100 border border-red-400 rounded-lg p-4">
-                          <p className="text-red-700">{submitError}</p>
-                        </div>
-                      )}
+
+                    {!registrationStatus.is_open ? (
+                      <div className="bg-red-100 border-2 border-red-400 rounded-lg p-6 text-center">
+                        <p className="text-red-700 font-semibold text-lg mb-2">Registration Closed</p>
+                        <p className="text-red-600">
+                          {registrationStatus.message || "Registrations are currently closed. Please check back later."}
+                        </p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSubmit} className="space-y-6">
+                        {submitError && (
+                          <div className="bg-red-100 border border-red-400 rounded-lg p-4">
+                            <p className="text-red-700">{submitError}</p>
+                          </div>
+                        )}
 
                       <div>
                         <Label htmlFor="fullName">Full Name *</Label>
@@ -577,7 +606,8 @@ export default function EventWebsite() {
                       >
                         Back to Home
                       </Button>
-                    </form>
+                      </form>
+                    )}
                   </div>
                 )}
               </motion.div>
