@@ -39,11 +39,32 @@ export async function GET(req: NextRequest) {
       .select("*", { count: "exact", head: true })
       .not("waiting_list_turn", "is", null);
 
+    // Get family member count
+    const { count: familyMemberCount } = await supabase
+      .from("registrations")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "family-member");
+
+    // Get khadem count
+    const { count: khademCount } = await supabase
+      .from("registrations")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "khadem");
+
+    // Get makhdoum count
+    const { count: makhdoumCount } = await supabase
+      .from("registrations")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "makhdoum");
+
     return NextResponse.json({
       totalRegistrations: totalRegistrations || 0,
       totalEmailsSent: totalEmailsSent || 0,
       totalConfirmed: totalConfirmed || 0,
       totalWaitingList: totalWaitingList || 0,
+      familyMemberCount: familyMemberCount || 0,
+      khademCount: khademCount || 0,
+      makhdoumCount: makhdoumCount || 0,
     });
   } catch (error) {
     console.error("Error fetching stats:", error);

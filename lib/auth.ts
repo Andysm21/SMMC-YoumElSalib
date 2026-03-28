@@ -1,9 +1,13 @@
-const ADMIN_USERNAME = "andrew";
-const ADMIN_PASSWORD = "andrew123";
+const ADMIN_CREDENTIALS = [
+  { username: "andrew", password: "andrew123" },
+  { username: "mora", password: "mora123" },
+];
 const SESSION_KEY = "admin_session";
 
 export const validateCredentials = (username: string, password: string): boolean => {
-  return username === ADMIN_USERNAME && password === ADMIN_PASSWORD;
+  return ADMIN_CREDENTIALS.some(
+    (admin) => admin.username === username && admin.password === password
+  );
 };
 
 export const setSession = (): void => {

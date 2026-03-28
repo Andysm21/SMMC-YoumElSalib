@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
   const waitingList = searchParams.get("waitingList");
   const confirmed = searchParams.get("confirmed");
+  const role = searchParams.get("role");
   const search = searchParams.get("search");
   const page = parseInt(searchParams.get("page") || "1", 10);
   const pageSize = parseInt(searchParams.get("pageSize") || "20", 10);
@@ -37,6 +38,9 @@ export async function GET(req: NextRequest) {
       query = query.eq("is_confirmed", true);
     } else if (confirmed === "false") {
       query = query.eq("is_confirmed", false);
+    }
+    if (role && role !== "all") {
+      query = query.eq("role", role);
     }
     if (search) {
       query = query.ilike("confirmation_code", `%${search}%`);

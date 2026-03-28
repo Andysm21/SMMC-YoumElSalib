@@ -29,6 +29,7 @@ export default function AdminDashboard() {
   const [waitingListOnly, setWaitingListOnly] = useState(false);
   const [confirmedFilter, setConfirmedFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -37,6 +38,11 @@ export default function AdminDashboard() {
     totalEmailsSent: 0,
     totalConfirmed: 0,
     totalWaitingList: 0,
+  });
+  const [roleStats, setRoleStats] = useState({
+    familyMember: 0,
+    khadem: 0,
+    makhdoum: 0,
   });
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [registrationStatus, setRegistrationStatus] = useState({
@@ -52,9 +58,10 @@ export default function AdminDashboard() {
     }
     fetchRegistrations();
     fetchTotalStats();
+    fetchRoleStats();
     fetchRegistrationStatus();
     // eslint-disable-next-line
-  }, [router, waitingListOnly, confirmedFilter, search, page]);
+  }, [router, waitingListOnly, confirmedFilter, roleFilter, search, page]);
 
   const fetchRegistrationStatus = async () => {
     try {
@@ -114,6 +121,22 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchRoleStats = async () => {
+    try {
+      const response = await fetch(`/api/admin/stats`);
+      if (response.ok) {
+        const data = await response.json();
+        setRoleStats({
+          familyMember: data.familyMemberCount || 0,
+          khadem: data.khademCount || 0,
+          makhdoum: data.makhdoumCount || 0,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch role stats:", err);
+    }
+  };
+
   const fetchRegistrations = async () => {
     setIsLoading(true);
     setError(null);
@@ -121,6 +144,7 @@ export default function AdminDashboard() {
       const params = new URLSearchParams();
       if (waitingListOnly) params.set("waitingList", "true");
       if (confirmedFilter !== "all") params.set("confirmed", confirmedFilter);
+      if (roleFilter !== "all") params.set("role", roleFilter);
       if (search) params.set("search", search);
       params.set("page", String(page));
       params.set("pageSize", String(pageSize));
@@ -266,6 +290,56 @@ export default function AdminDashboard() {
           </Card>
         </motion.div>
 
+        {/* Role Stats Cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="grid md:grid-cols-3 gap-6 mb-10"
+        >
+          <Card className="bg-gradient-to-br from-[#fce7f3] to-[#fbcfe8] border-0 shadow-lg">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-pink-500/10 rounded-xl p-4">
+                <Users className="w-8 h-8 text-pink-600" />
+              </div>
+              <div>
+                <p className="text-[#7a5c3e] text-sm font-semibold">Family Members</p>
+                <p className="text-4xl font-extrabold text-pink-600">
+                  {roleStats.familyMember}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-[#dbeafe] to-[#bfdbfe] border-0 shadow-lg">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-cyan-500/10 rounded-xl p-4">
+                <Users className="w-8 h-8 text-cyan-600" />
+              </div>
+              <div>
+                <p className="text-[#7a5c3e] text-sm font-semibold">Khadem</p>
+                <p className="text-4xl font-extrabold text-cyan-600">
+                  {roleStats.khadem}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-[#e9d5ff] to-[#d8b4fe] border-0 shadow-lg">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-purple-500/10 rounded-xl p-4">
+                <Users className="w-8 h-8 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-[#7a5c3e] text-sm font-semibold">Makhdoum</p>
+                <p className="text-4xl font-extrabold text-purple-600">
+                  {roleStats.makhdoum}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Registrations Table + Controls */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -303,6 +377,17 @@ export default function AdminDashboard() {
                 <option value="all">All</option>
                 <option value="true">Confirmed Only</option>
                 <option value="false">Unconfirmed Only</option>
+              </select>
+              <select
+                value={roleFilter}
+                onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
+                className="px-3 py-2 rounded-lg border border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A]"
+                style={{ minWidth: 140 }}
+              >
+                <option value="all">All Roles</option>
+                <option value="family-member">Family Member</option>
+                <option value="khadem">Khadem</option>
+                <option value="makhdoum">Makhdoum</option>
               </select>
             </div>
           </div>
