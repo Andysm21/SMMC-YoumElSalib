@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, XCircle, Send, Loader } from "lucide-react";
+import { CheckCircle2, XCircle, Send, Loader, Edit3 } from "lucide-react";
 
 interface Registration {
   id: string;
@@ -16,6 +16,7 @@ interface Registration {
   created_at: string;
   waiting_list_turn?: number | null;
   is_confirmed?: boolean;
+  role?: string | null;
 }
 
 interface AdminTableProps {
@@ -35,6 +36,10 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
   const [adminKey, setAdminKey] = useState<string>("");
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [editingRoleReg, setEditingRoleReg] = useState<Registration | null>(null);
+  const [newRole, setNewRole] = useState<string>("");
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
   // Handlers must be defined before return
   const handleSendEmail = async (registration: Registration) => {
@@ -143,28 +148,119 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
     }
   };
 
+  const handleUpdateRole = async (registration: Registration) => {
+    if (!newRole) {
+      alert("Please select a role");
+      return;
+    }
+    if (!adminKey) {
+      setShowKeyInput(true);
+      return;
+    }
+
+    setUpdatingRoleId(registration.id);
+    try {
+      const response = await fetch(`/api/admin/update-role`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({
+          registrationId: registration.id,
+          role: newRole,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update role: ${response.statusText}`);
+      }
+
+      alert(`✅ Role updated for ${registration.full_name}`);
+      setEditingRoleId(null);
+      setEditingRoleReg(null);
+      setNewRole("");
+      window.location.reload();
+    } catch (error) {
+      alert(`❌ Failed to update role: ${String(error)}`);
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
   return (
     <>
+      {/* Role Edit Modal */}
+      {editingRoleId && editingRoleReg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gradient-to-br from-white to-[#f8f6f2] border-2 border-[#D4622A] rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl"
+          >
+            <h3 className="text-2xl font-bold text-[#D4622A] mb-2">Edit Role</h3>
+            <p className="text-[#7a5c3e] mb-6">Set role for <strong>{editingRoleReg.full_name}</strong></p>
+            
+            <div className="space-y-4">
+              <select
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg text-base font-semibold bg-white border-2 border-[#e2c9b0] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-all"
+              >
+                <option value="">-- Select Role --</option>
+                <option value="family-member">👨‍👩‍👧 Family Member</option>
+                <option value="khadem">✝️ Khadem</option>
+                <option value="makhdoum">📖 Makhdoum</option>
+              </select>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleUpdateRole(editingRoleReg)}
+                  disabled={updatingRoleId === editingRoleReg.id || !newRole}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-bold hover:from-green-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                >
+                  {updatingRoleId === editingRoleReg.id ? (
+                    <Loader className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>✓ Save</>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingRoleId(null);
+                    setEditingRoleReg(null);
+                    setNewRole("");
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-400 text-white rounded-lg font-bold hover:bg-gray-500 transition-all"
+                >
+                  ✕ Cancel
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Admin Key Modal */}
       {showKeyInput && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-[#1a0f08] border border-[#D4622A]/30 rounded-lg p-6 max-w-md w-full mx-4"
+            className="bg-white border border-[#e2c9b0] rounded-lg p-6 max-w-md w-full mx-4"
           >
-            <h3 className="text-white font-semibold mb-4">Enter Admin Secret Key</h3>
+            <h3 className="text-[#7a5c3e] font-semibold mb-4">Enter Admin Secret Key</h3>
             <input
               type="password"
               value={adminKey}
               onChange={(e) => setAdminKey(e.target.value)}
               placeholder="Admin secret key..."
-              className="w-full px-4 py-2 rounded-lg bg-white/10 border border-[#D4622A]/30 text-white placeholder-white/50 mb-4 focus:outline-none focus:border-[#D4622A]"
+              className="w-full px-4 py-2 rounded-lg bg-[#f8f6f2] border border-[#e2c9b0] text-[#7a5c3e] placeholder-[#bfa98c] mb-4 focus:outline-none focus:border-[#D4622A]"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setShowKeyInput(false)}
-                className="flex-1 px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
+                className="flex-1 px-4 py-2 bg-[#f8f6f2] text-[#7a5c3e] rounded-lg hover:bg-[#e2c9b0] transition"
               >
                 Cancel
               </button>
@@ -192,6 +288,7 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
                   <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Phone</th>
                   <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Church</th>
                   <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Code</th>
+                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Role</th>
                   <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Email Sent</th>
                   <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Confirmed</th>
                   <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Waiting List</th>
@@ -213,6 +310,25 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
                     <td className="px-6 py-4 text-[#7a5c3e] text-sm">{registration.phone}</td>
                     <td className="px-6 py-4 text-[#7a5c3e] text-sm">{registration.church_name}</td>
                     <td className="px-6 py-4 text-[#D4622A] font-mono text-sm font-semibold">{registration.confirmation_code}</td>
+                    <td className="px-6 py-4 text-left">
+                      {!registration.role ? (
+                        <span className="inline-block px-3 py-1 rounded-full text-[#D4622A] text-sm font-bold bg-yellow-100 border-2 border-yellow-300">
+                          ⚠️ No Role
+                        </span>
+                      ) : (
+                        <span className={`inline-block px-4 py-2 rounded-full text-white text-sm font-bold shadow-md ${
+                          registration.role === 'family-member' ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
+                          registration.role === 'khadem' ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                          registration.role === 'makhdoum' ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
+                          'bg-gradient-to-r from-gray-500 to-gray-600'
+                        }`}>
+                          {registration.role === 'family-member' ? '👨‍👩‍👧 Family Member' :
+                           registration.role === 'khadem' ? '✝️ Khadem' :
+                           registration.role === 'makhdoum' ? '📖 Makhdoum' :
+                           registration.role}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-center">
                       {registration.email_sent ? (
                         <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
@@ -276,6 +392,13 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
                           {notifyingId === registration.id ? "Notifying..." : "Notify & Confirm"}
                         </button>
                       )}
+                      <button
+                        onClick={() => { setEditingRoleId(registration.id); setEditingRoleReg(registration); setNewRole(""); }}
+                        className="px-3 py-2 rounded-lg flex items-center justify-center gap-2 bg-yellow-400 text-white hover:bg-yellow-500 transition font-semibold"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        Edit Role
+                      </button>
                     </td>
                   </motion.tr>
                 ))}

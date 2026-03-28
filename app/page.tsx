@@ -130,6 +130,7 @@ interface FormData {
   phone: string;
   churchName: string;
   otherChurch: string;
+  role: string;
 }
 
 export default function EventWebsite() {
@@ -140,6 +141,7 @@ export default function EventWebsite() {
     phone: '',
     churchName: '',
     otherChurch: '',
+    role: '',
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -174,6 +176,9 @@ export default function EventWebsite() {
     if (formData.churchName === "other" && !formData.otherChurch.trim()) {
       newErrors.otherChurch = "Please specify your church name";
     }
+    if (!formData.role) {
+      newErrors.role = "Please select a role";
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -206,6 +211,7 @@ export default function EventWebsite() {
         email: formData.email,
         phone: formData.phone,
         church: formData.churchName === "other" ? formData.otherChurch : formData.churchName,
+        role: formData.role,
       };
 
       const response = await fetch("/api/register", {
@@ -232,6 +238,7 @@ export default function EventWebsite() {
         phone: "",
         churchName: "st-mary-maraashly",
         otherChurch: "",
+        role: "",
       });
     } catch (error) {
       setSubmitError("Network error. Please try again.");
@@ -247,6 +254,7 @@ export default function EventWebsite() {
       phone: '',
       churchName: 'st-mary-maraashly',
       otherChurch: '',
+      role: '',
     });
     setIsSubmitted(false);
   };
@@ -511,6 +519,29 @@ export default function EventWebsite() {
                           </select>
                         </div>
                         {errors.churchName && <p className="text-red-500 text-sm mt-1">{errors.churchName}</p>}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="role">Role *</Label>
+                        <div className="relative mt-1">
+                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none z-10" />
+                          <select
+                            id="role"
+                            required
+                            value={formData.role}
+                            onChange={(e) => handleInputChange('role', e.target.value)}
+                            disabled={isLoading}
+                            className="pl-10 w-full px-3 py-2 h-10 rounded-xl border border-input bg-white text-gray-900"
+                          >
+                            <option value="" disabled>
+                              -- Please select a role --
+                            </option>
+                            <option value="family-member">Family Member</option>
+                            <option value="khadem">Khadem</option>
+                            <option value="makhdoum">Makhdoum</option>
+                          </select>
+                        </div>
+                        {errors.role && <p className="text-red-500 text-sm mt-1">{errors.role}</p>}
                       </div>
 
                       {formData.churchName === 'other' && (

@@ -4,12 +4,12 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json();
-    const { name, email, phone, church } = body;
+    const { name, email, phone, church, role } = body;
 
     // Validate required fields
-    if (!name || !email || !phone || !church) {
+    if (!name || !email || !phone || !church || !role) {
       return NextResponse.json(
-        { error: "Name, email, phone, and church are required" },
+        { error: "Name, email, phone, church, and role are required" },
         { status: 400 }
       );
     }
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
           email: email,
           phone: phone,
           church_name: church,
+          role: role,
           confirmation_code: confirmationCode,
           is_confirmed: isConfirmed,
           email_sent: false,

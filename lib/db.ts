@@ -26,6 +26,7 @@ export type Registration = {
   email: string
   phone: string
   church_name: string
+  role: string
   confirmation_code: string
   is_confirmed: boolean
   email_sent: boolean
