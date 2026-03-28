@@ -29,6 +29,7 @@ export default function AdminDashboard() {
   const [waitingListOnly, setWaitingListOnly] = useState(false);
   const [confirmedFilter, setConfirmedFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [searchType, setSearchType] = useState<"all" | "name" | "email" | "phone" | "regNumber">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
@@ -61,7 +62,7 @@ export default function AdminDashboard() {
     fetchRoleStats();
     fetchRegistrationStatus();
     // eslint-disable-next-line
-  }, [router, waitingListOnly, confirmedFilter, roleFilter, search, page]);
+  }, [router, waitingListOnly, confirmedFilter, roleFilter, search, searchType, page]);
 
   const fetchRegistrationStatus = async () => {
     try {
@@ -145,7 +146,10 @@ export default function AdminDashboard() {
       if (waitingListOnly) params.set("waitingList", "true");
       if (confirmedFilter !== "all") params.set("confirmed", confirmedFilter);
       if (roleFilter !== "all") params.set("role", roleFilter);
-      if (search) params.set("search", search);
+      if (search) {
+        params.set("search", search);
+        params.set("searchType", searchType);
+      }
       params.set("page", String(page));
       params.set("pageSize", String(pageSize));
       const response = await fetch(`/api/admin/registrations?${params.toString()}`);
@@ -167,6 +171,135 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     clearSession();
     router.push("/admin");
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      // Dynamic import of xlsx
+      const XLSX = await import("xlsx");
+
+      // Fetch all registrations (waiting list and confirmed)
+      const waitingListResponse = await fetch(
+        `/api/admin/registrations?waitingList=true&pageSize=10000`
+      );
+      const waitingListData = await waitingListResponse.json();
+      let waitingList = waitingListData.registrations || [];
+
+      const confirmedResponse = await fetch(
+        `/api/admin/registrations?confirmed=true&pageSize=10000`
+      );
+      const confirmedData = await confirmedResponse.json();
+      let confirmed = confirmedData.registrations || [];
+
+      // Ensure proper sorting with explicit date parsing
+      waitingList = waitingList.sort(
+        (a: any, b: any) =>
+          (a.waiting_list_turn || 0) - (b.waiting_list_turn || 0)
+      );
+
+      confirmed = confirmed.sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // Waiting List Sheet
+      const waitingListSheet = XLSX.utils.json_to_sheet(
+        waitingList.map((reg: any) => ({
+          "Turn #": reg.waiting_list_turn || "-",
+          "Full Name": reg.full_name,
+          Email: reg.email,
+          Phone: reg.phone,
+          "Church Name": reg.church_name,
+          Role: reg.role || "Not Specified",
+          "Confirmation Code": reg.confirmation_code,
+          "Registration Date": new Date(reg.created_at).toLocaleString(
+            "en-US"
+          ),
+        }))
+      );
+
+      // Confirmed Sheet - Sort by date descending (newest first)
+      const confirmedSheet = XLSX.utils.json_to_sheet(
+        confirmed.map((reg: any) => ({
+          "Full Name": reg.full_name,
+          Email: reg.email,
+          Phone: reg.phone,
+          "Church Name": reg.church_name,
+          Role: reg.role || "Not Specified",
+          Status: reg.is_confirmed ? "Confirmed" : "Unconfirmed",
+          "Email Sent": reg.email_sent ? "Yes" : "No",
+          "Confirmation Code": reg.confirmation_code,
+          "Registration Date": new Date(reg.created_at).toLocaleString(
+            "en-US"
+          ),
+        }))
+      );
+
+      // Style the sheets
+      const headerStyle = {
+        font: { bold: true, color: { rgb: "FFFFFF" }, size: 12 },
+        fill: { fgColor: { rgb: "D4622A" } },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        },
+      };
+
+      // Apply header style to waiting list sheet
+      const waitingListRange = XLSX.utils.decode_range(
+        waitingListSheet["!ref"] || "A1"
+      );
+      for (let C = waitingListRange.s.c; C <= waitingListRange.e.c; ++C) {
+        const address = XLSX.utils.encode_col(C) + "1";
+        if (!waitingListSheet[address]) continue;
+        waitingListSheet[address].s = headerStyle;
+      }
+
+      // Apply header style to confirmed sheet
+      const confirmedRange = XLSX.utils.decode_range(
+        confirmedSheet["!ref"] || "A1"
+      );
+      for (let C = confirmedRange.s.c; C <= confirmedRange.e.c; ++C) {
+        const address = XLSX.utils.encode_col(C) + "1";
+        if (!confirmedSheet[address]) continue;
+        confirmedSheet[address].s = headerStyle;
+      }
+
+      // Set column widths
+      const columnWidths = [
+        { wch: 12 },
+        { wch: 20 },
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 20 },
+        { wch: 25 },
+      ];
+      waitingListSheet["!cols"] = columnWidths;
+      confirmedSheet["!cols"] = columnWidths;
+
+      // Add sheets to workbook
+      XLSX.utils.book_append_sheet(wb, waitingListSheet, "Waiting List");
+      XLSX.utils.book_append_sheet(wb, confirmedSheet, "Confirmed");
+
+      // Generate filename with date
+      const date = new Date().toISOString().split("T")[0];
+      const filename = `Event_Registrations_${date}.xlsx`;
+
+      // Write file
+      XLSX.writeFile(wb, filename);
+    } catch (error) {
+      console.error("Error exporting Excel:", error);
+      alert("Failed to export Excel file");
+    }
   };
 
   return (
@@ -346,51 +479,128 @@ export default function AdminDashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold text-[#D4622A] mb-2">All Registrations</h2>
               <p className="text-[#7a5c3e]">View and manage all event registrations</p>
             </div>
-            <div className="flex flex-col md:flex-row gap-2 items-end">
-              <input
-                type="text"
-                placeholder="Search by Reg Number..."
-                value={search}
-                onChange={e => { setSearch(e.target.value); setPage(1); }}
-                className="px-3 py-2 rounded-lg border border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] placeholder-[#bfa98c] focus:outline-none focus:border-[#D4622A]"
-              />
-              <label className="flex items-center gap-2 text-[#7a5c3e] text-sm">
+            <button
+              onClick={handleExportExcel}
+              className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-bold shadow-md transition-all duration-300"
+            >
+              📊 Export to Excel
+            </button>
+          </div>
+
+          {/* Search and Filters Section */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-[#D4AF37]/20">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              {/* Search Input */}
+              <div className="lg:col-span-2">
+                <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">
+                  Search
+                </label>
                 <input
-                  type="checkbox"
-                  checked={waitingListOnly}
-                  onChange={e => { setWaitingListOnly(e.target.checked); setPage(1); }}
-                  className="accent-[#D4622A]"
+                  type="text"
+                  placeholder="Enter search term..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] placeholder-[#bfa98c] focus:outline-none focus:border-[#D4622A] transition-colors"
                 />
-                Waiting List Only
+              </div>
+
+              {/* Search Type */}
+              <div>
+                <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">
+                  Search By
+                </label>
+                <select
+                  value={searchType}
+                  onChange={(e) => {
+                    setSearchType(
+                      e.target.value as
+                        | "all"
+                        | "name"
+                        | "email"
+                        | "phone"
+                        | "regNumber"
+                    );
+                    setPage(1);
+                  }}
+                  className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
+                >
+                  <option value="all">Reg Number</option>
+                  <option value="name">Name</option>
+                  <option value="email">Email</option>
+                  <option value="phone">Phone</option>
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">
+                  Status
+                </label>
+                <select
+                  value={confirmedFilter}
+                  onChange={(e) => {
+                    setConfirmedFilter(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
+                >
+                  <option value="all">All</option>
+                  <option value="true">Confirmed</option>
+                  <option value="false">Unconfirmed</option>
+                </select>
+              </div>
+
+              {/* Role Filter */}
+              <div>
+                <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">
+                  Role
+                </label>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
+                >
+                  <option value="all">All Roles</option>
+                  <option value="family-member">Family Member</option>
+                  <option value="khadem">Khadem</option>
+                  <option value="makhdoum">Makhdoum</option>
+                  <option value="undefined">Undefined</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Waiting List Checkbox */}
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="waitingListOnly"
+                checked={waitingListOnly}
+                onChange={(e) => {
+                  setWaitingListOnly(e.target.checked);
+                  setPage(1);
+                }}
+                className="w-4 h-4 accent-[#D4622A] cursor-pointer rounded"
+              />
+              <label
+                htmlFor="waitingListOnly"
+                className="text-sm font-semibold text-[#7a5c3e] cursor-pointer"
+              >
+                Show Waiting List Only
               </label>
-              <select
-                value={confirmedFilter}
-                onChange={e => { setConfirmedFilter(e.target.value); setPage(1); }}
-                className="px-3 py-2 rounded-lg border border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A]"
-                style={{ minWidth: 140 }}
-              >
-                <option value="all">All</option>
-                <option value="true">Confirmed Only</option>
-                <option value="false">Unconfirmed Only</option>
-              </select>
-              <select
-                value={roleFilter}
-                onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
-                className="px-3 py-2 rounded-lg border border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A]"
-                style={{ minWidth: 140 }}
-              >
-                <option value="all">All Roles</option>
-                <option value="family-member">Family Member</option>
-                <option value="khadem">Khadem</option>
-                <option value="makhdoum">Makhdoum</option>
-              </select>
             </div>
           </div>
+
           <AdminTable
             registrations={registrations}
             isLoading={isLoading}

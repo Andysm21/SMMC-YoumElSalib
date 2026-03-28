@@ -57,6 +57,15 @@ export async function GET(req: NextRequest) {
       .select("*", { count: "exact", head: true })
       .eq("role", "makhdoum");
 
+    // Get undefined count (both NULL and 'UNDEFINED' string)
+    const { data: undefinedData } = await supabase
+      .from("registrations")
+      .select("id");
+    
+    const undefinedCount = undefinedData?.filter(
+      (reg: any) => reg.role === null || reg.role === "UNDEFINED"
+    ).length || 0;
+
     return NextResponse.json({
       totalRegistrations: totalRegistrations || 0,
       totalEmailsSent: totalEmailsSent || 0,
