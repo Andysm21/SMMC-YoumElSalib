@@ -27,13 +27,15 @@ interface AdminTableProps {
   pageSize?: number;
   total?: number;
   onPageChange?: (page: number) => void;
+  adminKey?: string;
+  onRefresh?: () => void;
 }
 
 
-export default function AdminTable({ registrations, isLoading, error }: AdminTableProps) {
+export default function AdminTable({ registrations, isLoading, error, adminKey: initialAdminKey = "", onRefresh }: AdminTableProps) {
   // All hooks at the top, always called in the same order
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
-  const [adminKey, setAdminKey] = useState<string>("");
+  const [adminKey, setAdminKey] = useState<string>(initialAdminKey);
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
@@ -70,7 +72,11 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
 
       const data = await response.json();
       alert(`✅ Email sent successfully to ${registration.email}`);
-      window.location.reload();
+      
+      // Call onRefresh if provided instead of reloading
+      if (onRefresh) {
+        onRefresh();
+      }
     } catch (error) {
       console.error("Error sending email:", error);
       alert(`❌ Failed to send email: ${String(error)}`);
@@ -140,7 +146,11 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
         throw new Error(`Failed to notify: ${response.statusText}`);
       }
       alert(`✅ Notified and confirmed ${registration.full_name}`);
-      window.location.reload();
+      
+      // Call onRefresh if provided instead of reloading
+      if (onRefresh) {
+        onRefresh();
+      }
     } catch (error) {
       alert(`❌ Failed to notify: ${String(error)}`);
     } finally {
@@ -180,7 +190,11 @@ export default function AdminTable({ registrations, isLoading, error }: AdminTab
       setEditingRoleId(null);
       setEditingRoleReg(null);
       setNewRole("");
-      window.location.reload();
+      
+      // Call onRefresh if provided instead of reloading
+      if (onRefresh) {
+        onRefresh();
+      }
     } catch (error) {
       alert(`❌ Failed to update role: ${String(error)}`);
     } finally {

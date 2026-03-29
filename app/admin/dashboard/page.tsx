@@ -609,6 +609,8 @@ export default function AdminDashboard() {
             pageSize={pageSize}
             total={total}
             onPageChange={setPage}
+            adminKey={adminKey}
+            onRefresh={fetchRegistrations}
           />
           {/* Pagination Controls */}
           <div className="flex justify-center mt-8">

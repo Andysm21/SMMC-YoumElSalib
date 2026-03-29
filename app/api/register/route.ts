@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     let confirmationCode = '';
     let waitingListTurn: number | null = null;
     let isConfirmed = false;
-    const forceWaitingList = totalConfirmed >= 160;
+    const forceWaitingList = totalConfirmed >= 140;
 
     if (church === 'st-mary-maraashly' && !forceWaitingList) {
       // Normal registration code
