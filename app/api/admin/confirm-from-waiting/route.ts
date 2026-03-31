@@ -35,8 +35,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Only allow promotion from waiting or cancelled status
-    if (user.status !== "waiting" && user.status !== "cancelled") {
+    // Only allow promotion if user is on waiting list (waiting_list_turn is NOT NULL and is_confirmed = false)
+    // OR if status is "waiting"
+    const isOnWaitingList = user.waiting_list_turn !== null && user.waiting_list_turn !== undefined && !user.is_confirmed;
+    const hasWaitingStatus = user.status === "waiting";
+    
+    if (!isOnWaitingList && !hasWaitingStatus) {
       return NextResponse.json(
         {
           error: "Cannot promote user",
