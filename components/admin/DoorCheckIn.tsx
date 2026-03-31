@@ -1,0 +1,449 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, LogOut, CheckCircle2, Clock, AlertCircle, Loader } from "lucide-react";
+
+interface Registration {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  church_name: string;
+  confirmation_code: string;
+  attended?: boolean;
+  attended_at?: string | null;
+  is_confirmed?: boolean;
+  waiting_list_turn?: number | null;
+}
+
+interface DoorCheckInProps {
+  onLogout: () => void;
+}
+
+export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Registration[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Registration | null>(null);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [checkedInUsers, setCheckedInUsers] = useState<Set<string>>(new Set());
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.trim()) {
+        handleSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    setErrorMessage("");
+    try {
+      const response = await fetch(`/api/admin/search?q=${encodeURIComponent(searchQuery)}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setSearchResults(data.results || []);
+        if (data.results?.length === 0) {
+          setErrorMessage("No users found matching your search.");
+        }
+      } else {
+        setErrorMessage(data.error || "Search failed");
+        setSearchResults([]);
+      }
+    } catch (error) {
+      setErrorMessage("Failed to search. Please try again.");
+      setSearchResults([]);
+      console.error("Search error:", error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleCheckIn = async (registration: Registration) => {
+    // Check if user is confirmed
+    if (!registration.is_confirmed) {
+      setErrorMessage("❌ This person is on the waiting list and cannot check in yet. They must be confirmed first.");
+      return;
+    }
+
+    if (checkedInUsers.has(registration.id)) {
+      return; // Already checked in
+    }
+
+    setIsCheckingIn(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const response = await fetch("/api/admin/checkin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: registration.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setCheckedInUsers(new Set([...checkedInUsers, registration.id]));
+        setSuccessMessage(`✅ ${registration.full_name} checked in successfully!`);
+        setSelectedUser({
+          ...registration,
+          attended: true,
+          attended_at: new Date().toISOString(),
+        });
+
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccessMessage("");
+          setSelectedUser(null);
+        }, 3000);
+
+        // Update search results
+        const updatedResults = searchResults.map((r) =>
+          r.id === registration.id ? { ...r, attended: true, attended_at: new Date().toISOString() } : r
+        );
+        setSearchResults(updatedResults);
+      } else {
+        // Handle backend validation errors (e.g., 403 for unconfirmed)
+        if (response.status === 403) {
+          setErrorMessage("❌ This person is on the waiting list and cannot check in yet. They must be confirmed first.");
+        } else {
+          setErrorMessage(data.error || "Failed to check in user");
+        }
+      }
+    } catch (error) {
+      setErrorMessage("Failed to check in user. Please try again.");
+      console.error("Check-in error:", error);
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#f8f6f2] via-[#f3e9e0] to-[#f8f6f2]">
+      <div className="container mx-auto px-4 py-6 md:py-10">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <img src="/poster.jpg" alt="Event Logo" className="w-14 h-14 md:w-16 md:h-16 rounded-full shadow-lg border-4 border-[#D4622A]/30 object-cover bg-white" />
+            <div>
+              <h1 className="text-3xl md:text-4xl font-black text-[#D4622A] mb-1 tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>
+                Check-In
+              </h1>
+              <p className="text-[#7a5c3e] text-sm md:text-base">Door Check-In System</p>
+            </div>
+          </div>
+          <Button
+            onClick={onLogout}
+            className="bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white py-2 px-6 rounded-xl font-bold shadow-md transition-all duration-300 w-full sm:w-auto"
+          >
+            <LogOut className="w-5 h-5" />
+            Logout
+          </Button>
+        </motion.div>
+
+        {/* Main Content */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          {/* Search Section */}
+          <div className="lg:col-span-2">
+            <Card className="bg-white shadow-xl border-0 rounded-2xl">
+              <CardContent className="p-6">
+                {/* Search Input */}
+                <div className="mb-6">
+                  <label className="block text-[#7a5c3e] font-semibold mb-3">
+                    Search Attendee
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#D4622A]" />
+                    <Input
+                      type="text"
+                      placeholder="Enter code, email, phone, or name"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-12 py-3 text-lg bg-[#f8f6f2] border-[#e2c9b0] text-[#7a5c3e] placeholder:text-[#bfa98c] focus:border-[#D4622A] rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                {/* Error Message */}
+                {errorMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6 flex items-start gap-3"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-red-700 text-sm">{errorMessage}</p>
+                  </motion.div>
+                )}
+
+                {/* Success Message */}
+                {successMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-green-100 border border-green-300 rounded-lg p-4 mb-6 flex items-start gap-3"
+                  >
+                    <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-green-700 text-sm font-semibold">{successMessage}</p>
+                  </motion.div>
+                )}
+
+                {/* Search Results */}
+                {isSearching && (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader className="w-6 h-6 text-[#D4622A] animate-spin" />
+                  </div>
+                )}
+
+                {!isSearching && searchResults.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-[#7a5c3e] font-semibold text-sm mb-4">
+                      Found {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
+                    </p>
+                    {searchResults.map((result) => (
+                      <motion.div
+                        key={result.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
+                          result.is_confirmed && !result.attended
+                            ? "bg-white border-[#D4622A] hover:bg-[#D4622A]/5"
+                            : result.attended
+                            ? "bg-green-50 border-green-300"
+                            : "bg-gray-50 border-gray-300 opacity-75 cursor-not-allowed"
+                        }`}
+                        onClick={() => result.is_confirmed && !result.attended && setSelectedUser(result)}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <p className="font-semibold text-[#7a5c3e]">{result.full_name}</p>
+                            <p className="text-sm text-[#bfa98c]">{result.email}</p>
+                            <p className="text-sm text-[#bfa98c]">{result.phone}</p>
+                            <p className="text-xs text-[#7a5c3e] mt-2 font-mono">Code: {result.confirmation_code}</p>
+                            
+                            {/* Status Badges */}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {result.waiting_list_turn !== null && result.waiting_list_turn !== undefined && (
+                                <span className="inline-block px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold">
+                                  🔔 WL #{result.waiting_list_turn}
+                                </span>
+                              )}
+                              {result.is_confirmed && (
+                                <span className="inline-block px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">
+                                  ✓ Confirmed
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {result.attended ? (
+                            <div className="flex items-center gap-2 bg-green-100 px-3 py-1 rounded-full flex-shrink-0">
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                              <span className="text-xs font-bold text-green-600">Checked In</span>
+                            </div>
+                          ) : result.is_confirmed ? (
+                            <div className="flex items-center gap-2 bg-blue-100 px-3 py-1 rounded-full flex-shrink-0">
+                              <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                              <span className="text-xs font-bold text-blue-600">✅ Ready</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 bg-orange-100 px-3 py-1 rounded-full flex-shrink-0">
+                              <Clock className="w-4 h-4 text-orange-600" />
+                              <span className="text-xs font-bold text-orange-600">⏳ Waiting</span>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {!isSearching && searchQuery.trim() && searchResults.length === 0 && !errorMessage && (
+                  <div className="text-center py-8">
+                    <AlertCircle className="w-8 h-8 text-[#bfa98c] mx-auto mb-2" />
+                    <p className="text-[#7a5c3e]">No results found</p>
+                  </div>
+                )}
+
+                {!searchQuery.trim() && searchResults.length === 0 && (
+                  <div className="text-center py-12">
+                    <Search className="w-12 h-12 text-[#D4622A]/20 mx-auto mb-3" />
+                    <p className="text-[#7a5c3e] font-semibold">Start searching to find attendees</p>
+                    <p className="text-sm text-[#bfa98c] mt-1">Use code, email, phone, or name</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar - Selected User Details */}
+          <div>
+            {selectedUser ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="sticky top-6"
+              >
+                <Card className="bg-white shadow-xl border-0 rounded-2xl">
+                  <CardContent className="p-6">
+                    <h3 className="font-bold text-[#7a5c3e] mb-4 text-lg">Check In Details</h3>
+
+                    <div className="space-y-4 mb-6">
+                      <div>
+                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Name</p>
+                        <p className="text-lg font-bold text-[#7a5c3e]">{selectedUser.full_name}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Email</p>
+                        <p className="text-sm text-[#7a5c3e] break-all">{selectedUser.email}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Phone</p>
+                        <p className="text-sm text-[#7a5c3e]">{selectedUser.phone}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Church</p>
+                        <p className="text-sm text-[#7a5c3e]">{selectedUser.church_name}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Code</p>
+                        <p className="text-sm font-mono text-[#D4622A] font-bold">{selectedUser.confirmation_code}</p>
+                      </div>
+
+                      {/* Status Section */}
+                      <div className="pt-2 border-t border-[#e2c9b0]">
+                        {selectedUser.waiting_list_turn !== null && selectedUser.waiting_list_turn !== undefined && (
+                          <div className="mb-3">
+                            <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Status</p>
+                            <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-200">
+                              <span className="text-lg">⏳</span>
+                              <div>
+                                <p className="font-bold text-yellow-700 text-sm">On Waiting List</p>
+                                <p className="text-xs text-yellow-600">Position: #{selectedUser.waiting_list_turn}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Confirmation Status</p>
+                        {selectedUser.is_confirmed ? (
+                          <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                            <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                            <div>
+                              <p className="font-bold text-green-700 text-sm">✅ Confirmed</p>
+                              <p className="text-xs text-green-600">Ready to attend event</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                            <div>
+                              <p className="font-bold text-red-700 text-sm">❌ Not Confirmed</p>
+                              <p className="text-xs text-red-600">Must be confirmed to attend</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status */}
+                    <div className="mb-6">
+                      {selectedUser.attended ? (
+                        <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 text-center">
+                          <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                          <p className="font-bold text-green-700">Already Checked In</p>
+                          {selectedUser.attended_at && (
+                            <p className="text-xs text-green-600 mt-2">
+                              {new Date(selectedUser.attended_at).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      ) : !selectedUser.is_confirmed ? (
+                        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4">
+                          <div className="flex items-start gap-3">
+                            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-red-700 mb-1">Cannot Check In</p>
+                              <p className="text-sm text-red-600">This person is on the waiting list.</p>
+                              <p className="text-xs text-red-500 mt-2">They must be confirmed first before they can attend.</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={() => handleCheckIn(selectedUser)}
+                          disabled={isCheckingIn || checkedInUsers.has(selectedUser.id)}
+                          className="w-full bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white py-4 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-50 text-lg"
+                        >
+                          {isCheckingIn ? (
+                            <>
+                              <Loader className="w-5 h-5 animate-spin mr-2" />
+                              Checking In...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-5 h-5 mr-2" />
+                              Confirm Attendance
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedUser(null)}
+                      className="w-full text-[#D4622A] font-semibold py-2 hover:bg-[#D4622A]/10 rounded-lg transition-colors duration-300"
+                    >
+                      Clear Selection
+                    </button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ) : (
+              <Card className="bg-white shadow-xl border-0 rounded-2xl h-full">
+                <CardContent className="p-6 flex items-center justify-center h-full min-h-96">
+                  <div className="text-center">
+                    <Clock className="w-12 h-12 text-[#D4622A]/20 mx-auto mb-3" />
+                    <p className="text-[#7a5c3e] font-semibold">Select an attendee to check in</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}

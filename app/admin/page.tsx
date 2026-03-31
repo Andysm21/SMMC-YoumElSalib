@@ -2,15 +2,20 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getSession, hasRole } from "@/lib/auth";
 import LoginForm from "@/components/admin/LoginForm";
 
 export default function AdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (getSession()) {
-      router.push("/admin/dashboard");
+    const session = getSession();
+    if (session && session.loggedIn) {
+      if (session.role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (session.role === "door") {
+        router.push("/admin/door");
+      }
     }
   }, [router]);
 

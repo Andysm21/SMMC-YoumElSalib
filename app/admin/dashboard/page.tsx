@@ -3,12 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { getSession, clearSession } from "@/lib/auth";
+import { getSession, clearSession, hasRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import AdminTable from "@/components/admin/AdminTable";
 import RegistrationStatusModal from "@/components/admin/RegistrationStatusModal";
-import { LogOut, Users, Pause, Play } from "lucide-react";
+import { EmailQuotaCard } from "@/components/admin/EmailQuotaCard";
+import { WaitingListManagement } from "@/components/admin/WaitingListManagement";
+import { LogOut, Users, Pause, Play, CheckCircle2 } from "lucide-react";
 
 interface Registration {
   id: string;
@@ -19,6 +21,8 @@ interface Registration {
   confirmation_code: string;
   email_sent: boolean;
   created_at: string;
+  attended?: boolean;
+  attended_at?: string | null;
 }
 
 export default function AdminDashboard() {
@@ -26,7 +30,8 @@ export default function AdminDashboard() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [waitingListOnly, setWaitingListOnly] = useState(false);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "search" | "waiting" | "attendance">("dashboard");
+  const [waitingListFilter, setWaitingListFilter] = useState<string>("all"); // "all", "waiting-unconfirmed", "waiting-confirmed"
   const [confirmedFilter, setConfirmedFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [searchType, setSearchType] = useState<"all" | "name" | "email" | "phone" | "regNumber">("all");
@@ -39,6 +44,7 @@ export default function AdminDashboard() {
     totalEmailsSent: 0,
     totalConfirmed: 0,
     totalWaitingList: 0,
+    totalAttended: 0,
   });
   const [roleStats, setRoleStats] = useState({
     familyMember: 0,
@@ -53,7 +59,8 @@ export default function AdminDashboard() {
   const [adminKey, setAdminKey] = useState<string>("");
 
   useEffect(() => {
-    if (!getSession()) {
+    const session = getSession();
+    if (!session || !hasRole("admin")) {
       router.push("/admin");
       return;
     }
@@ -62,7 +69,7 @@ export default function AdminDashboard() {
     fetchRoleStats();
     fetchRegistrationStatus();
     // eslint-disable-next-line
-  }, [router, waitingListOnly, confirmedFilter, roleFilter, search, searchType, page]);
+  }, [router, waitingListFilter, confirmedFilter, roleFilter, search, searchType, page]);
 
   const fetchRegistrationStatus = async () => {
     try {
@@ -143,7 +150,7 @@ export default function AdminDashboard() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (waitingListOnly) params.set("waitingList", "true");
+      if (waitingListFilter !== "all") params.set("waitingListFilter", waitingListFilter);
       if (confirmedFilter !== "all") params.set("confirmed", confirmedFilter);
       if (roleFilter !== "all") params.set("role", roleFilter);
       if (search) {
@@ -303,71 +310,107 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f8f6f2] via-[#f3e9e0] to-[#f8f6f2]">
-      <div className="container mx-auto px-4 py-10">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6"
-        >
-          <div className="flex items-center gap-4">
-            <img src="/poster.jpg" alt="Event Logo" className="w-16 h-16 rounded-full shadow-lg border-4 border-[#D4622A]/30 object-cover bg-white" />
-            <div>
-              <h1 className="text-5xl font-black text-[#D4622A] mb-1 tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>
-                Admin Dashboard
-              </h1>
-              <p className="text-[#7a5c3e] text-base">Event Registration Management</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (!adminKey) {
-                  const key = prompt("Enter Admin Secret Key:");
-                  if (key) {
-                    setAdminKey(key);
-                    setShowStatusModal(true);
-                  }
-                } else {
-                  setShowStatusModal(true);
-                }
-              }}
-              className={`flex items-center gap-2 py-3 px-6 rounded-xl font-bold shadow-md transition-all duration-300 ${
-                registrationStatus.is_open
-                  ? "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
-                  : "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white"
-              }`}
-            >
-              {registrationStatus.is_open ? (
-                <>
-                  <Play className="w-5 h-5" />
-                  Registrations Open
-                </>
-              ) : (
-                <>
-                  <Pause className="w-5 h-5" />
-                  Registrations Paused
-                </>
-              )}
-            </button>
-            <Button
-              onClick={handleLogout}
-              className="bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white py-3 px-8 rounded-xl font-bold shadow-md transition-all duration-300"
-            >
-              <LogOut className="w-5 h-5" />
-              Logout
-            </Button>
-          </div>
-        </motion.div>
+    <div className="min-h-screen bg-gradient-to-br from-[#f8f6f2] via-[#f3e9e0] to-[#f8f6f2] flex">
+      {/* Sticky Sidebar */}
+      <div className="fixed left-0 top-0 h-screen w-48 bg-white shadow-xl border-r-2 border-[#e2c9b0] flex flex-col z-50">
+        {/* Header in Sidebar */}
+        <div className="p-4 border-b border-[#e2c9b0]">
+          <img src="/poster.jpg" alt="Event Logo" className="w-12 h-12 rounded-full shadow-lg border-2 border-[#D4622A]/30 object-cover bg-white mb-2" />
+          <h2 className="text-lg font-bold text-[#D4622A]" style={{ fontFamily: 'Georgia, serif' }}>Admin</h2>
+          <p className="text-xs text-[#bfa98c]">Event Management</p>
+        </div>
 
-        {/* Stats Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
-        >
+        {/* Navigation Tabs */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+          <button
+            onClick={() => setActiveTab("dashboard")}
+            className={`w-full px-4 py-3 rounded-lg font-bold text-sm transition-all ${
+              activeTab === "dashboard"
+                ? "bg-[#D4622A] text-white shadow-lg"
+                : "bg-[#f8f6f2] text-[#7a5c3e] hover:bg-[#e2c9b0]"
+            }`}
+          >
+            📊 Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab("search")}
+            className={`w-full px-4 py-3 rounded-lg font-bold text-sm transition-all ${
+              activeTab === "search"
+                ? "bg-[#D4622A] text-white shadow-lg"
+                : "bg-[#f8f6f2] text-[#7a5c3e] hover:bg-[#e2c9b0]"
+            }`}
+          >
+            🔍 Search
+          </button>
+          <button
+            onClick={() => setActiveTab("waiting")}
+            className={`w-full px-4 py-3 rounded-lg font-bold text-sm transition-all ${
+              activeTab === "waiting"
+                ? "bg-[#D4622A] text-white shadow-lg"
+                : "bg-[#f8f6f2] text-[#7a5c3e] hover:bg-[#e2c9b0]"
+            }`}
+          >
+            📬 Waiting List
+          </button>
+          <button
+            onClick={() => setActiveTab("attendance")}
+            className={`w-full px-4 py-3 rounded-lg font-bold text-sm transition-all ${
+              activeTab === "attendance"
+                ? "bg-[#D4622A] text-white shadow-lg"
+                : "bg-[#f8f6f2] text-[#7a5c3e] hover:bg-[#e2c9b0]"
+            }`}
+          >
+            ✅ Attendance
+          </button>
+        </nav>
+
+        {/* Footer in Sidebar */}
+        <div className="p-4 border-t border-[#e2c9b0] space-y-2">
+          <button
+            onClick={() => setShowStatusModal(true)}
+            className="w-full px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg font-bold text-xs transition-all"
+          >
+            {registrationStatus.is_open ? (
+              <>
+                <Play className="w-4 h-4 inline mr-2" />
+                Registrations Open
+              </>
+            ) : (
+              <>
+                <Pause className="w-4 h-4 inline mr-2" />
+                Registrations Paused
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-full px-4 py-2 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white rounded-lg font-bold text-xs transition-all"
+          >
+            <LogOut className="w-4 h-4 inline mr-2" />
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 ml-48">
+        <div className="container mx-auto px-8 py-10">
+        
+        {/* Stats Cards - Dashboard Tab */}
+        {activeTab === "dashboard" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <h1 className="text-4xl font-bold text-[#D4622A] mb-8" style={{ fontFamily: 'Georgia, serif' }}>Dashboard Statistics</h1>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
+            >
           <Card className="bg-gradient-to-br from-[#fff7ef] to-[#f3e9e0] border-0 shadow-lg">
             <CardContent className="p-6 flex items-center gap-4">
               <div className="bg-[#D4622A]/10 rounded-xl p-4">
@@ -376,20 +419,6 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-[#7a5c3e] text-sm font-semibold">Total Registrations</p>
                 <p className="text-4xl font-extrabold text-[#D4622A]">{totalStats.totalRegistrations}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-[#f0f9ff] to-[#e0f2fe] border-0 shadow-lg">
-            <CardContent className="p-6 flex items-center gap-4">
-              <div className="bg-blue-500/10 rounded-xl p-4">
-                <Users className="w-8 h-8 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-[#7a5c3e] text-sm font-semibold">Emails Sent</p>
-                <p className="text-4xl font-extrabold text-blue-600">
-                  {totalStats.totalEmailsSent}
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -417,6 +446,20 @@ export default function AdminDashboard() {
                 <p className="text-[#7a5c3e] text-sm font-semibold">Waiting List</p>
                 <p className="text-4xl font-extrabold text-yellow-600">
                   {totalStats.totalWaitingList}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-[#dbeafe] to-[#bfdbfe] border-0 shadow-lg">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-blue-600/10 rounded-xl p-4">
+                <CheckCircle2 className="w-8 h-8 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-[#7a5c3e] text-sm font-semibold">Attended</p>
+                <p className="text-4xl font-extrabold text-blue-600">
+                  {totalStats.totalAttended || 0}
                 </p>
               </div>
             </CardContent>
@@ -471,173 +514,246 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+            </motion.div>
+            </motion.div>
+          )}
 
-        {/* Registrations Table + Controls */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-[#D4622A] mb-2">All Registrations</h2>
-              <p className="text-[#7a5c3e]">View and manage all event registrations</p>
-            </div>
-            <button
-              onClick={handleExportExcel}
-              className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-bold shadow-md transition-all duration-300"
+          {/* Search Tab */}
+          {activeTab === "search" && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
             >
-              📊 Export to Excel
-            </button>
-          </div>
-
-          {/* Search and Filters Section */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-[#D4AF37]/20">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {/* Search Input */}
-              <div className="lg:col-span-2">
-                <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">
-                  Search
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter search term..."
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
-                  }}
-                  className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] placeholder-[#bfa98c] focus:outline-none focus:border-[#D4622A] transition-colors"
-                />
-              </div>
-
-              {/* Search Type */}
-              <div>
-                <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">
-                  Search By
-                </label>
-                <select
-                  value={searchType}
-                  onChange={(e) => {
-                    setSearchType(
-                      e.target.value as
-                        | "all"
-                        | "name"
-                        | "email"
-                        | "phone"
-                        | "regNumber"
-                    );
-                    setPage(1);
-                  }}
-                  className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
-                >
-                  <option value="all">Reg Number</option>
-                  <option value="name">Name</option>
-                  <option value="email">Email</option>
-                  <option value="phone">Phone</option>
-                </select>
-              </div>
-
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">
-                  Status
-                </label>
-                <select
-                  value={confirmedFilter}
-                  onChange={(e) => {
-                    setConfirmedFilter(e.target.value);
-                    setPage(1);
-                  }}
-                  className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
-                >
-                  <option value="all">All</option>
-                  <option value="true">Confirmed</option>
-                  <option value="false">Unconfirmed</option>
-                </select>
-              </div>
-
-              {/* Role Filter */}
-              <div>
-                <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">
-                  Role
-                </label>
-                <select
-                  value={roleFilter}
-                  onChange={(e) => {
-                    setRoleFilter(e.target.value);
-                    setPage(1);
-                  }}
-                  className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
-                >
-                  <option value="all">All Roles</option>
-                  <option value="family-member">Family Member</option>
-                  <option value="khadem">Khadem</option>
-                  <option value="makhdoum">Makhdoum</option>
-                  <option value="undefined">Undefined</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Waiting List Checkbox */}
-            <div className="mt-4 flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="waitingListOnly"
-                checked={waitingListOnly}
-                onChange={(e) => {
-                  setWaitingListOnly(e.target.checked);
-                  setPage(1);
-                }}
-                className="w-4 h-4 accent-[#D4622A] cursor-pointer rounded"
-              />
-              <label
-                htmlFor="waitingListOnly"
-                className="text-sm font-semibold text-[#7a5c3e] cursor-pointer"
+              <h1 className="text-4xl font-bold text-[#D4622A] mb-8" style={{ fontFamily: 'Georgia, serif' }}>Search Registrations</h1>
+              
+              {/* Stats Summary */}
+              <motion.div
+                className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
               >
-                Show Waiting List Only
-              </label>
-            </div>
-          </div>
+                <Card className="bg-gradient-to-br from-[#fff7ef] to-[#f3e9e0] border-0 shadow-lg">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="bg-[#D4622A]/10 rounded-xl p-4">
+                      <Users className="w-8 h-8 text-[#D4622A]" />
+                    </div>
+                    <div>
+                      <p className="text-[#7a5c3e] text-sm font-semibold">Total Registrations</p>
+                      <p className="text-3xl font-extrabold text-[#D4622A]">{totalStats.totalRegistrations}</p>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          <AdminTable
-            registrations={registrations}
-            isLoading={isLoading}
-            error={error}
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={setPage}
-            adminKey={adminKey}
-            onRefresh={fetchRegistrations}
-          />
-          {/* Pagination Controls */}
-          <div className="flex justify-center mt-8">
-            <button
-              onClick={() => setPage(page - 1)}
-              disabled={page === 1}
-              className="px-5 py-3 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] text-white rounded-l-xl font-bold disabled:bg-gray-300 disabled:text-gray-500"
-            >Prev</button>
-            <span className="px-5 py-3 bg-[#f8f6f2] text-[#7a5c3e] border-t border-b border-[#e2c9b0]">
-              Page {page} of {Math.ceil(total / pageSize) || 1}
-            </span>
-            <button
-              onClick={() => setPage(page + 1)}
-              disabled={registrations.length < pageSize}
-              className="px-5 py-3 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] text-white rounded-r-xl font-bold disabled:bg-gray-300 disabled:text-gray-500"
-            >Next</button>
-          </div>
-        </motion.div>
+                <Card className="bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border-0 shadow-lg">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="bg-green-500/10 rounded-xl p-4">
+                      <Users className="w-8 h-8 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="text-[#7a5c3e] text-sm font-semibold">Confirmed</p>
+                      <p className="text-3xl font-extrabold text-green-600">{totalStats.totalConfirmed}</p>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        {/* Registration Status Modal */}
-        <RegistrationStatusModal
-          isOpen={showStatusModal}
-          onClose={() => setShowStatusModal(false)}
-          currentStatus={registrationStatus}
-          onStatusChange={handleUpdateRegistrationStatus}
-        />
+                <Card className="bg-gradient-to-br from-[#fef3c7] to-[#fde68a] border-0 shadow-lg">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="bg-yellow-500/10 rounded-xl p-4">
+                      <Users className="w-8 h-8 text-yellow-600" />
+                    </div>
+                    <div>
+                      <p className="text-[#7a5c3e] text-sm font-semibold">Waiting List</p>
+                      <p className="text-3xl font-extrabold text-yellow-600">{totalStats.totalWaitingList}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-[#dbeafe] to-[#bfdbfe] border-0 shadow-lg">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="bg-blue-600/10 rounded-xl p-4">
+                      <CheckCircle2 className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-[#7a5c3e] text-sm font-semibold">Attended</p>
+                      <p className="text-3xl font-extrabold text-blue-600">{totalStats.totalAttended || 0}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Search and Filters Section */}
+              <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-[#D4AF37]/20">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {/* Search Input */}
+                  <div className="lg:col-span-2">
+                    <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">Search</label>
+                    <input
+                      type="text"
+                      placeholder="Enter search term..."
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] placeholder-[#bfa98c] focus:outline-none focus:border-[#D4622A] transition-colors"
+                    />
+                  </div>
+
+                  {/* Search Type */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">Search By</label>
+                    <select
+                      value={searchType}
+                      onChange={(e) => {
+                        setSearchType(e.target.value as "all" | "name" | "email" | "phone" | "regNumber");
+                        setPage(1);
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
+                    >
+                      <option value="all">Reg Number</option>
+                      <option value="name">Name</option>
+                      <option value="email">Email</option>
+                      <option value="phone">Phone</option>
+                    </select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">Status</label>
+                    <select
+                      value={confirmedFilter}
+                      onChange={(e) => {
+                        setConfirmedFilter(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
+                    >
+                      <option value="all">All</option>
+                      <option value="true">Confirmed</option>
+                      <option value="false">Unconfirmed</option>
+                    </select>
+                  </div>
+
+                  {/* Role Filter */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">Role</label>
+                    <select
+                      value={roleFilter}
+                      onChange={(e) => {
+                        setRoleFilter(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
+                    >
+                      <option value="all">All Roles</option>
+                      <option value="family-member">Family Member</option>
+                      <option value="khadem">Khadem</option>
+                      <option value="makhdoum">Makhdoum</option>
+                      <option value="undefined">Undefined</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Waiting List Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-[#7a5c3e] mb-2">Waiting List Filter</label>
+                  <select
+                    value={waitingListFilter}
+                    onChange={(e) => {
+                      setWaitingListFilter(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border-2 border-[#e2c9b0] bg-[#f8f6f2] text-[#7a5c3e] focus:outline-none focus:border-[#D4622A] transition-colors"
+                  >
+                    <option value="all">All Registrations</option>
+                    <option value="waiting-unconfirmed">Waiting List - Unconfirmed</option>
+                    <option value="waiting-confirmed">Waiting List - Confirmed</option>
+                  </select>
+                </div>
+              </div>
+
+              <AdminTable
+                registrations={registrations}
+                isLoading={isLoading}
+                error={error}
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                onPageChange={setPage}
+                adminKey={adminKey}
+                onRefresh={fetchRegistrations}
+              />
+              
+              {/* Pagination Controls */}
+              <div className="flex justify-center mt-8">
+                <button
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                  className="px-5 py-3 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] text-white rounded-l-xl font-bold disabled:bg-gray-300 disabled:text-gray-500"
+                >Prev</button>
+                <span className="px-5 py-3 bg-[#f8f6f2] text-[#7a5c3e] border-t border-b border-[#e2c9b0]">
+                  Page {page} of {Math.ceil(total / pageSize) || 1}
+                </span>
+                <button
+                  onClick={() => setPage(page + 1)}
+                  disabled={registrations.length < pageSize}
+                  className="px-5 py-3 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] text-white rounded-r-xl font-bold disabled:bg-gray-300 disabled:text-gray-500"
+                >Next</button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Waiting List Tab */}
+          {activeTab === "waiting" && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <h1 className="text-4xl font-bold text-[#D4622A] mb-8" style={{ fontFamily: 'Georgia, serif' }}>Waiting List Management</h1>
+              
+              {/* Email Quota */}
+              <div className="mb-8">
+                <EmailQuotaCard />
+              </div>
+
+              {/* Waiting List Management */}
+              <div>
+                <WaitingListManagement />
+              </div>
+            </motion.div>
+          )}
+
+          {/* Attendance Tab */}
+          {activeTab === "attendance" && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <h1 className="text-4xl font-bold text-[#D4622A] mb-8" style={{ fontFamily: 'Georgia, serif' }}>Event Attendance</h1>
+              <Card className="bg-white shadow-lg border-2 border-[#e2c9b0] p-8 text-center">
+                <CardContent>
+                  <p className="text-[#7a5c3e] mb-4">Redirecting to Attendance Check-in...</p>
+                  <button 
+                    onClick={() => router.push('/admin/door')}
+                    className="px-6 py-3 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] text-white rounded-lg font-bold"
+                  >
+                    Go to Attendance Page
+                  </button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </div>
       </div>
+
+      {/* Registration Status Modal */}
+      <RegistrationStatusModal
+        isOpen={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        currentStatus={registrationStatus}
+        onStatusChange={handleUpdateRegistrationStatus}
+      />
     </div>
   );
 }

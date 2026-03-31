@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     // Parse query params for filtering, searching, pagination
     const { searchParams } = new URL(req.url);
-  const waitingList = searchParams.get("waitingList");
+  const waitingListFilter = searchParams.get("waitingListFilter");
   const confirmed = searchParams.get("confirmed");
   const role = searchParams.get("role");
   const search = searchParams.get("search");
@@ -31,10 +31,15 @@ export async function GET(req: NextRequest) {
       .from("registrations")
       .select("*", { count: "exact" });
 
-    if (waitingList === "true") {
-      // Only show registrations where waiting_list_turn is NOT null
-      query = query.not("waiting_list_turn", "is", null);
+    // Handle waiting list filter
+    if (waitingListFilter === "waiting-unconfirmed") {
+      // Waiting list AND NOT confirmed
+      query = query.not("waiting_list_turn", "is", null).eq("is_confirmed", false);
+    } else if (waitingListFilter === "waiting-confirmed") {
+      // Waiting list AND confirmed
+      query = query.not("waiting_list_turn", "is", null).eq("is_confirmed", true);
     }
+    
     if (confirmed === "true") {
       query = query.eq("is_confirmed", true);
     } else if (confirmed === "false") {

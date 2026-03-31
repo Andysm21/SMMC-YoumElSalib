@@ -17,6 +17,8 @@ interface Registration {
   waiting_list_turn?: number | null;
   is_confirmed?: boolean;
   role?: string | null;
+  attended?: boolean;
+  attended_at?: string | null;
 }
 
 interface AdminTableProps {
@@ -294,20 +296,20 @@ export default function AdminTable({ registrations, isLoading, error, adminKey: 
       <Card className="bg-white/90 shadow-lg border-0 overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e2c9b0] bg-[#f8f6f2]">
-                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Name</th>
-                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Email</th>
-                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Phone</th>
-                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Church</th>
-                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Code</th>
-                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Role</th>
-                  <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Email Sent</th>
-                  <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Confirmed</th>
-                  <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Waiting List</th>
-                  <th className="px-6 py-4 text-left text-[#7a5c3e] font-bold">Date</th>
-                  <th className="px-6 py-4 text-center text-[#7a5c3e] font-bold">Action</th>
+                  <th className="px-3 py-2 text-left text-[#7a5c3e] font-bold text-xs uppercase">Name</th>
+                  <th className="px-3 py-2 text-left text-[#7a5c3e] font-bold text-xs uppercase" style={{ minWidth: '120px', maxWidth: '150px' }}>Email</th>
+                  <th className="px-3 py-2 text-left text-[#7a5c3e] font-bold text-xs uppercase">Phone</th>
+                  <th className="px-3 py-2 text-left text-[#7a5c3e] font-bold text-xs uppercase" style={{ minWidth: '100px', maxWidth: '120px' }}>Church</th>
+                  <th className="px-3 py-2 text-left text-[#7a5c3e] font-bold text-xs uppercase">Code</th>
+                  <th className="px-3 py-2 text-left text-[#7a5c3e] font-bold text-xs uppercase">Role</th>
+                  <th className="px-3 py-2 text-center text-[#7a5c3e] font-bold text-xs uppercase">Sent</th>
+                  <th className="px-3 py-2 text-center text-[#7a5c3e] font-bold text-xs uppercase">Confirmed</th>
+                  <th className="px-3 py-2 text-center text-[#7a5c3e] font-bold text-xs uppercase">Attended</th>
+                  <th className="px-3 py-2 text-center text-[#7a5c3e] font-bold text-xs uppercase">Wait</th>
+                  <th className="px-3 py-2 text-center text-[#7a5c3e] font-bold text-xs uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -319,100 +321,105 @@ export default function AdminTable({ registrations, isLoading, error, adminKey: 
                     transition={{ delay: index * 0.05 }}
                     className="border-b border-[#e2c9b0] hover:bg-[#f3e9e0]/60 transition-colors duration-200"
                   >
-                    <td className="px-6 py-4 text-[#3d2a13] font-medium">{registration.full_name}</td>
-                    <td className="px-6 py-4 text-[#7a5c3e] text-sm">{registration.email}</td>
-                    <td className="px-6 py-4 text-[#7a5c3e] text-sm">{registration.phone}</td>
-                    <td className="px-6 py-4 text-[#7a5c3e] text-sm">{registration.church_name}</td>
-                    <td className="px-6 py-4 text-[#D4622A] font-mono text-sm font-semibold">{registration.confirmation_code}</td>
-                    <td className="px-6 py-4 text-left">
+                    <td className="px-3 py-3 text-[#3d2a13] font-medium text-sm truncate">{registration.full_name}</td>
+                    <td className="px-3 py-3 text-[#7a5c3e] text-xs break-words" style={{ minWidth: '120px', maxWidth: '150px', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{registration.email}</td>
+                    <td className="px-3 py-3 text-[#7a5c3e] text-xs">{registration.phone}</td>
+                    <td className="px-3 py-3 text-[#7a5c3e] text-xs break-words" style={{ minWidth: '100px', maxWidth: '120px', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{registration.church_name}</td>
+                    <td className="px-3 py-3 text-[#D4622A] font-mono text-xs font-bold">{registration.confirmation_code}</td>
+                    <td className="px-3 py-3 text-left">
                       {!registration.role ? (
-                        <span className="inline-block px-3 py-1 rounded-full text-[#D4622A] text-sm font-bold bg-yellow-100 border-2 border-yellow-300">
-                          ⚠️ No Role
+                        <span className="inline-block px-2 py-1 rounded text-[#D4622A] text-xs font-bold bg-yellow-100 border border-yellow-300 whitespace-nowrap">
+                          No Role
                         </span>
                       ) : (
-                        <span className={`inline-block px-4 py-2 rounded-full text-white text-sm font-bold shadow-md ${
-                          registration.role === 'family-member' ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
-                          registration.role === 'khadem' ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                          registration.role === 'makhdoum' ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
-                          'bg-gradient-to-r from-gray-500 to-gray-600'
+                        <span className={`inline-block px-2 py-1 rounded text-white text-xs font-bold whitespace-nowrap ${
+                          registration.role === 'family-member' ? 'bg-blue-500' :
+                          registration.role === 'khadem' ? 'bg-green-500' :
+                          registration.role === 'makhdoum' ? 'bg-purple-500' :
+                          'bg-gray-500'
                         }`}>
-                          {registration.role === 'family-member' ? '👨‍👩‍👧 Family Member' :
-                           registration.role === 'khadem' ? '✝️ Khadem' :
-                           registration.role === 'makhdoum' ? '📖 Makhdoum' :
-                           registration.role}
+                          {registration.role === 'family-member' ? 'FAM' :
+                           registration.role === 'khadem' ? 'KH' :
+                           registration.role === 'makhdoum' ? 'MKH' :
+                           'Other'}
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 py-3 text-center">
                       {registration.email_sent ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-200 text-green-700 text-xs font-bold">✓</span>
                       ) : (
-                        <XCircle className="w-5 h-5 text-red-400 mx-auto" />
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-200 text-red-700 text-xs font-bold">✗</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 py-3 text-center">
                       {registration.is_confirmed ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-200 text-green-700 text-xs font-bold">✓</span>
                       ) : (
-                        <XCircle className="w-5 h-5 text-red-400 mx-auto" />
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-200 text-red-700 text-xs font-bold">✗</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 py-3 text-center">
+                      {registration.attended ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-200 text-blue-700 text-xs font-bold">✓</span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 text-gray-600 text-xs font-bold">✗</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-center">
                       {registration.waiting_list_turn != null ? (
-                        <span className="text-yellow-600 font-bold">#{registration.waiting_list_turn}</span>
+                        <span className="text-yellow-600 font-bold text-sm">#{registration.waiting_list_turn}</span>
                       ) : (
                         <span className="text-[#bfa98c]">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-[#7a5c3e] text-sm">
-                      {(() => {
-                        const d = new Date(registration.created_at);
-                        const pad = (n: number) => n.toString().padStart(2, '0');
-                        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 text-center flex flex-col gap-2 items-center">
-                      <button
-                        onClick={() => handleSendEmail(registration)}
-                        disabled={sendingEmail === registration.id || registration.email_sent}
-                        className={`px-3 py-2 rounded-lg flex items-center justify-center gap-2 transition ${
-                          sendingEmail === registration.id
-                            ? "bg-[#D4622A]/50 text-white/50 cursor-not-allowed"
-                            : registration.email_sent
-                            ? "bg-green-500/30 text-green-700 cursor-default"
-                            : "bg-[#D4622A] text-white hover:bg-[#B84F1E]"
-                        }`}
-                      >
-                        {sendingEmail === registration.id ? (
-                          <Loader className="w-4 h-4 animate-spin" />
-                        ) : registration.email_sent ? (
-                          <CheckCircle2 className="w-4 h-4" />
-                        ) : (
-                          <Send className="w-4 h-4" />
-                        )}
-                        {sendingEmail === registration.id ? "Sending..." : registration.email_sent ? "Sent" : "Send"}
-                      </button>
-                      {registration.waiting_list_turn != null && !registration.is_confirmed && (
+                    <td className="px-3 py-3 text-center">
+                      <div className="flex flex-wrap gap-1 items-center justify-center">
                         <button
-                          onClick={() => handleNotifyAndConfirm(registration)}
-                          disabled={notifyingId === registration.id}
-                          className={`px-3 py-2 rounded-lg flex items-center justify-center gap-2 transition ${
-                            notifyingId === registration.id
-                              ? "bg-yellow-500/50 text-white/50 cursor-not-allowed"
-                              : "bg-yellow-500 text-white hover:bg-yellow-600"}
-                        `}
+                          onClick={() => handleSendEmail(registration)}
+                          disabled={sendingEmail === registration.id || registration.email_sent}
+                          className={`px-2 py-1 rounded text-xs font-bold flex items-center gap-1 transition whitespace-nowrap ${
+                            sendingEmail === registration.id
+                              ? "bg-[#D4622A]/50 text-white/50 cursor-not-allowed"
+                              : registration.email_sent
+                              ? "bg-green-500/30 text-green-700 cursor-default"
+                              : "bg-[#D4622A] text-white hover:bg-[#B84F1E]"
+                          }`}
+                          title="Send email"
                         >
-                          {notifyingId === registration.id ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                          {notifyingId === registration.id ? "Notifying..." : "Notify & Confirm"}
+                          {sendingEmail === registration.id ? (
+                            <Loader className="w-3 h-3 animate-spin" />
+                          ) : registration.email_sent ? (
+                            <CheckCircle2 className="w-3 h-3" />
+                          ) : (
+                            <Send className="w-3 h-3" />
+                          )}
+                          <span className="hidden sm:inline">{sendingEmail === registration.id ? "Sending..." : registration.email_sent ? "Sent" : "Send"}</span>
                         </button>
-                      )}
-                      <button
-                        onClick={() => { setEditingRoleId(registration.id); setEditingRoleReg(registration); setNewRole(""); }}
-                        className="px-3 py-2 rounded-lg flex items-center justify-center gap-2 bg-yellow-400 text-white hover:bg-yellow-500 transition font-semibold"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                        Edit Role
-                      </button>
+                        {registration.waiting_list_turn != null && !registration.is_confirmed && (
+                          <button
+                            onClick={() => handleNotifyAndConfirm(registration)}
+                            disabled={notifyingId === registration.id}
+                            className={`px-2 py-1 rounded text-xs font-bold flex items-center gap-1 transition whitespace-nowrap ${
+                              notifyingId === registration.id
+                                ? "bg-yellow-500/50 text-white/50 cursor-not-allowed"
+                                : "bg-yellow-500 text-white hover:bg-yellow-600"}
+                          `}
+                            title="Notify and confirm from waiting list"
+                          >
+                            {notifyingId === registration.id ? <Loader className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                            <span className="hidden sm:inline">{notifyingId === registration.id ? "..." : "Notify"}</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => { setEditingRoleId(registration.id); setEditingRoleReg(registration); setNewRole(""); }}
+                          className="px-2 py-1 rounded text-xs font-bold flex items-center gap-1 bg-yellow-400 text-white hover:bg-yellow-500 transition whitespace-nowrap"
+                          title="Edit role"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          <span className="hidden sm:inline">Role</span>
+                        </button>
+                      </div>
                     </td>
                   </motion.tr>
                 ))}

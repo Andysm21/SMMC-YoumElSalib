@@ -27,9 +27,15 @@ export default function LoginForm() {
       return;
     }
 
-    if (validateCredentials(username, password)) {
-      setSession();
-      router.push("/admin/dashboard");
+    const user = validateCredentials(username, password);
+    if (user) {
+      setSession(username, user.role);
+      // Redirect based on role
+      if (user.role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (user.role === "door") {
+        router.push("/admin/door");
+      }
     } else {
       setError("Invalid username or password");
       setIsLoading(false);

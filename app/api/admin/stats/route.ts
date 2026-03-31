@@ -33,11 +33,18 @@ export async function GET(req: NextRequest) {
       .select("*", { count: "exact", head: true })
       .eq("is_confirmed", true);
 
-    // Get total waiting list
+    // Get total waiting list (TRUE waiting: waiting_list_turn != null AND is_confirmed = false)
     const { count: totalWaitingList } = await supabase
       .from("registrations")
       .select("*", { count: "exact", head: true })
-      .not("waiting_list_turn", "is", null);
+      .not("waiting_list_turn", "is", null)
+      .eq("is_confirmed", false);
+
+    // Get total attended
+    const { count: totalAttended } = await supabase
+      .from("registrations")
+      .select("*", { count: "exact", head: true })
+      .eq("attended", true);
 
     // Get family member count
     const { count: familyMemberCount } = await supabase
@@ -71,6 +78,7 @@ export async function GET(req: NextRequest) {
       totalEmailsSent: totalEmailsSent || 0,
       totalConfirmed: totalConfirmed || 0,
       totalWaitingList: totalWaitingList || 0,
+      totalAttended: totalAttended || 0,
       familyMemberCount: familyMemberCount || 0,
       khademCount: khademCount || 0,
       makhdoumCount: makhdoumCount || 0,
