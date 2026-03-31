@@ -1,8 +1,6 @@
 import { AdminUser, AdminSession, UserRole } from "./types";
 
 const ADMIN_CREDENTIALS: AdminUser[] = [
-  { username: "admin", password: "admin123", role: "admin" },
-  { username: "mora", password: "mora123", role: "admin" },
   { username: "andrew", password: "andrew123", role: "admin" },
   { username: "door1", password: "door1", role: "door" },
   { username: "door2", password: "door2", role: "door" },

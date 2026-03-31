@@ -10,7 +10,7 @@ import AdminTable from "@/components/admin/AdminTable";
 import RegistrationStatusModal from "@/components/admin/RegistrationStatusModal";
 import { EmailQuotaCard } from "@/components/admin/EmailQuotaCard";
 import { WaitingListManagement } from "@/components/admin/WaitingListManagement";
-import { LogOut, Users, Pause, Play, CheckCircle2 } from "lucide-react";
+import { LogOut, Users, Pause, Play, CheckCircle2, Menu, X } from "lucide-react";
 
 interface Registration {
   id: string;
@@ -57,12 +57,19 @@ export default function AdminDashboard() {
     message: "",
   });
   const [adminKey, setAdminKey] = useState<string>("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const session = getSession();
     if (!session || !hasRole("admin")) {
       router.push("/admin");
       return;
+    }
+    // Load admin key from session storage if available
+    const savedAdminKey = sessionStorage.getItem("adminKey");
+    if (savedAdminKey) {
+      setAdminKey(savedAdminKey);
     }
     fetchRegistrations();
     fetchTotalStats();
@@ -84,8 +91,23 @@ export default function AdminDashboard() {
   };
 
   const handleUpdateRegistrationStatus = async (is_open: boolean, message: string) => {
-    if (!adminKey) {
-      throw new Error("Admin key is required. Please enter it and try again.");
+    // Get session to verify current user
+    const session = getSession();
+    if (!session || session.username !== "andrew") {
+      throw new Error("Only andrew can pause/resume registrations.");
+    }
+
+    let key = adminKey;
+    if (!key) {
+      // Prompt for admin key
+      const promptedKey = prompt("Enter admin key:");
+      if (!promptedKey) {
+        throw new Error("Admin key is required.");
+      }
+      key = promptedKey;
+      // Save for current session
+      setAdminKey(key);
+      sessionStorage.setItem("adminKey", key);
     }
 
     try {
@@ -93,13 +115,14 @@ export default function AdminDashboard() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
+          "x-admin-key": key,
         },
         body: JSON.stringify({ is_open, message }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update registration status");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update registration status");
       }
 
       const data = await response.json();
@@ -310,14 +333,37 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f8f6f2] via-[#f3e9e0] to-[#f8f6f2] flex">
-      {/* Sticky Sidebar */}
-      <div className="fixed left-0 top-0 h-screen w-48 bg-white shadow-xl border-r-2 border-[#e2c9b0] flex flex-col z-50">
+    <div className="min-h-screen bg-gradient-to-br from-[#f8f6f2] via-[#f3e9e0] to-[#f8f6f2] flex flex-col md:flex-row">
+      {/* Sidebar - Hidden on mobile, visible on desktop */}
+      <div className={`fixed md:static left-0 top-0 h-screen w-full md:w-auto bg-white shadow-xl border-r-2 border-[#e2c9b0] flex flex-col z-50 transition-all duration-300 ${
+        sidebarCollapsed ? 'md:w-20' : 'md:w-48'
+      } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         {/* Header in Sidebar */}
-        <div className="p-4 border-b border-[#e2c9b0]">
-          <img src="/poster.jpg" alt="Event Logo" className="w-12 h-12 rounded-full shadow-lg border-2 border-[#D4622A]/30 object-cover bg-white mb-2" />
-          <h2 className="text-lg font-bold text-[#D4622A]" style={{ fontFamily: 'Georgia, serif' }}>Admin</h2>
-          <p className="text-xs text-[#bfa98c]">Event Management</p>
+        <div className="p-4 border-b border-[#e2c9b0] flex items-center justify-between">
+          {!sidebarCollapsed && (
+            <>
+              <div>
+                <img src="/poster.jpg" alt="Event Logo" className="w-12 h-12 rounded-full shadow-lg border-2 border-[#D4622A]/30 object-cover bg-white mb-2" />
+                <h2 className="text-lg font-bold text-[#D4622A]" style={{ fontFamily: 'Georgia, serif' }}>Admin</h2>
+                <p className="text-xs text-[#bfa98c]">Event Management</p>
+              </div>
+            </>
+          )}
+          <button
+            onClick={() => {
+              setSidebarCollapsed(!sidebarCollapsed);
+            }}
+            className="p-2 hover:bg-[#f8f6f2] rounded-lg transition-colors ml-auto hidden md:block"
+            title={sidebarCollapsed ? "Expand" : "Collapse"}
+          >
+            {sidebarCollapsed ? <Menu className="w-5 h-5 text-[#D4622A]" /> : <X className="w-5 h-5 text-[#D4622A]" />}
+          </button>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="p-2 hover:bg-[#f8f6f2] rounded-lg transition-colors ml-auto md:hidden"
+          >
+            <X className="w-5 h-5 text-[#D4622A]" />
+          </button>
         </div>
 
         {/* Navigation Tabs */}
@@ -328,9 +374,10 @@ export default function AdminDashboard() {
               activeTab === "dashboard"
                 ? "bg-[#D4622A] text-white shadow-lg"
                 : "bg-[#f8f6f2] text-[#7a5c3e] hover:bg-[#e2c9b0]"
-            }`}
+            } flex items-center justify-center`}
+            title="Dashboard"
           >
-            📊 Dashboard
+            {sidebarCollapsed ? "📊" : "📊 Dashboard"}
           </button>
           <button
             onClick={() => setActiveTab("search")}
@@ -338,9 +385,10 @@ export default function AdminDashboard() {
               activeTab === "search"
                 ? "bg-[#D4622A] text-white shadow-lg"
                 : "bg-[#f8f6f2] text-[#7a5c3e] hover:bg-[#e2c9b0]"
-            }`}
+            } flex items-center justify-center`}
+            title="Search"
           >
-            🔍 Search
+            {sidebarCollapsed ? "🔍" : "🔍 Search"}
           </button>
           <button
             onClick={() => setActiveTab("waiting")}
@@ -348,9 +396,10 @@ export default function AdminDashboard() {
               activeTab === "waiting"
                 ? "bg-[#D4622A] text-white shadow-lg"
                 : "bg-[#f8f6f2] text-[#7a5c3e] hover:bg-[#e2c9b0]"
-            }`}
+            } flex items-center justify-center`}
+            title="Waiting List"
           >
-            📬 Waiting List
+            {sidebarCollapsed ? "📬" : "📬 Waiting List"}
           </button>
           <button
             onClick={() => setActiveTab("attendance")}
@@ -358,9 +407,10 @@ export default function AdminDashboard() {
               activeTab === "attendance"
                 ? "bg-[#D4622A] text-white shadow-lg"
                 : "bg-[#f8f6f2] text-[#7a5c3e] hover:bg-[#e2c9b0]"
-            }`}
+            } flex items-center justify-center`}
+            title="Attendance"
           >
-            ✅ Attendance
+            {sidebarCollapsed ? "✅" : "✅ Attendance"}
           </button>
         </nav>
 
@@ -368,33 +418,58 @@ export default function AdminDashboard() {
         <div className="p-4 border-t border-[#e2c9b0] space-y-2">
           <button
             onClick={() => setShowStatusModal(true)}
-            className="w-full px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg font-bold text-xs transition-all"
+            className="w-full px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg font-bold text-xs transition-all flex items-center justify-center"
+            title={registrationStatus.is_open ? "Registrations Open" : "Registrations Paused"}
           >
             {registrationStatus.is_open ? (
               <>
-                <Play className="w-4 h-4 inline mr-2" />
-                Registrations Open
+                {!sidebarCollapsed && <Play className="w-4 h-4 inline mr-2" />}
+                {sidebarCollapsed ? "▶" : "Registrations Open"}
               </>
             ) : (
               <>
-                <Pause className="w-4 h-4 inline mr-2" />
-                Registrations Paused
+                {!sidebarCollapsed && <Pause className="w-4 h-4 inline mr-2" />}
+                {sidebarCollapsed ? "⏸" : "Registrations Paused"}
               </>
             )}
           </button>
           <button
             onClick={handleLogout}
-            className="w-full px-4 py-2 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white rounded-lg font-bold text-xs transition-all"
+            className="w-full px-4 py-2 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white rounded-lg font-bold text-xs transition-all flex items-center justify-center"
+            title="Logout"
           >
-            <LogOut className="w-4 h-4 inline mr-2" />
-            Logout
+            {sidebarCollapsed ? <LogOut className="w-4 h-4" /> : (
+              <>
+                <LogOut className="w-4 h-4 inline mr-2" />
+                Logout
+              </>
+            )}
           </button>
         </div>
       </div>
 
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Main Content Area */}
-      <div className="flex-1 ml-48">
-        <div className="container mx-auto px-8 py-10">
+      <div className={`flex-1 w-full transition-all duration-300`}>
+        {/* Mobile Header with Menu Button */}
+        <div className="md:hidden bg-white border-b-2 border-[#e2c9b0] p-4 flex items-center justify-between sticky top-0 z-30">
+          <h1 className="text-lg font-bold text-[#D4622A]">Admin Dashboard</h1>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 hover:bg-[#f8f6f2] rounded-lg transition-colors"
+          >
+            <Menu className="w-6 h-6 text-[#D4622A]" />
+          </button>
+        </div>
+
+        <div className="container mx-auto px-4 md:px-8 py-6 md:py-10">
         
         {/* Stats Cards - Dashboard Tab */}
         {activeTab === "dashboard" && (
@@ -403,7 +478,7 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <h1 className="text-4xl font-bold text-[#D4622A] mb-8" style={{ fontFamily: 'Georgia, serif' }}>Dashboard Statistics</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-[#D4622A] mb-6 md:mb-8" style={{ fontFamily: 'Georgia, serif' }}>Dashboard Statistics</h1>
             
             <motion.div
               initial={{ opacity: 0, y: 20 }}

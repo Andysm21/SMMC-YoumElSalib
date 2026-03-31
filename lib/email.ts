@@ -460,7 +460,7 @@ export function generateWaitingListHTML(name: string, referenceCode: string): st
                               <tr style="margin-bottom: 12px; display: block;">
                                 <td style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
                                   <p style="margin: 0 0 4px 0; font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.5px;">Date & Time</p>
-                                  <p style="margin: 0; font-size: 15px; color: #333; font-weight: 500;">Wednesday, April 2nd, 2026 at 7:30 PM</p>
+                                  <p style="margin: 0; font-size: 15px; color: #333; font-weight: 500;">Thursday, April 2nd, 2026 at 7:30 PM</p>
                                 </td>
                               </tr>
                               <tr style="margin-bottom: 12px; display: block;">

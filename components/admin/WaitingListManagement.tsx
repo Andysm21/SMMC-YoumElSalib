@@ -36,6 +36,7 @@ export function WaitingListManagement() {
   const [currentOffset, setCurrentOffset] = useState(0);
   const [emailsSent, setEmailsSent] = useState<Set<string>>(new Set());
   const [sendingBatch, setSendingBatch] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   useEffect(() => {
     fetchWaitingList(0);
@@ -131,19 +132,34 @@ export function WaitingListManagement() {
     }
   };
 
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedUserIds(waitingUsers.map((u) => u.id));
+    } else {
+      setSelectedUserIds([]);
+    }
+  };
+
+  const handleSelectUser = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
   const handleSendBatchEmails = async () => {
-    if (waitingUsers.length === 0) {
-      alert("No users in this batch to send emails to");
+    if (selectedUserIds.length === 0) {
+      alert("Please select at least one user to send emails to.");
       return;
     }
 
-    const unsent = waitingUsers.filter((u) => !emailsSent.has(u.id));
+    const unsent = waitingUsers.filter((u) => selectedUserIds.includes(u.id) && !emailsSent.has(u.id));
     if (unsent.length === 0) {
-      alert("All users in this batch have already received emails");
+      alert("All selected users in this batch have already received emails");
       return;
     }
 
-    if (!confirm(`Send waiting list emails to ${unsent.length} users?`)) {
+    if (!confirm(`Send waiting list emails to ${unsent.length} selected user(s)?`)) {
       return;
     }
 
@@ -168,7 +184,8 @@ export function WaitingListManagement() {
         sessionStorage.setItem("adminKey", adminKey);
       }
 
-      // Send waiting list emails (one email per user with waiting list template)
+
+      // Send waiting list emails (one email per selected user with waiting list template)
       const emailPromises = unsent.map((user) =>
         fetch("/api/admin/send-email-waiting", {
           method: "POST",
@@ -193,10 +210,13 @@ export function WaitingListManagement() {
       unsent.forEach((u) => newSentEmails.add(u.id));
       setEmailsSent(newSentEmails);
 
+
       setActionResult({
         success: true,
         message: `Sent ${successful}/${unsent.length} waiting list emails successfully`,
       });
+      // Deselect users after sending
+      setSelectedUserIds([]);
 
       // Refresh the waiting list to get updated email_sent_count from DB
       setTimeout(() => {
@@ -270,15 +290,15 @@ export function WaitingListManagement() {
 
       {/* Waiting List Table */}
       <Card className="bg-white border-0 shadow-lg">
-        <CardContent className="p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-[#7a5c3e]">
+        <CardContent className="p-4 md:p-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <h3 className="text-base md:text-lg font-bold text-[#7a5c3e]">
               Waiting List Batch Management
             </h3>
             <Button
               onClick={handleSendBatchEmails}
               disabled={waitingUsers.length === 0 || sendingBatch}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2 px-4 rounded-lg font-semibold flex items-center gap-2"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2 px-4 rounded-lg font-semibold flex items-center justify-center gap-2"
             >
               {sendingBatch ? (
                 <>
@@ -288,7 +308,8 @@ export function WaitingListManagement() {
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  Send Batch Emails
+                  <span className="hidden sm:inline">Send Batch Emails</span>
+                  <span className="sm:hidden">Send</span>
                 </>
               )}
             </Button>
@@ -301,24 +322,33 @@ export function WaitingListManagement() {
               <p className="text-[#bfa98c] text-sm mt-1">All batches have been processed!</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto -mx-4 md:mx-0">
+              <table className="w-full text-sm md:text-base">
                 <thead>
                   <tr className="border-b-2 border-yellow-200 bg-yellow-50">
-                    <th className="text-left p-3 text-xs font-bold text-[#7a5c3e] uppercase w-8">#</th>
-                    <th className="text-left p-3 text-xs font-bold text-[#7a5c3e] uppercase">Name</th>
-                    <th className="text-left p-3 text-xs font-bold text-[#7a5c3e] uppercase">Email</th>
-                    <th className="text-left p-3 text-xs font-bold text-[#7a5c3e] uppercase">Phone</th>
-                    <th className="text-left p-3 text-xs font-bold text-[#7a5c3e] uppercase">Church</th>
-                    <th className="text-left p-3 text-xs font-bold text-[#7a5c3e] uppercase">Code</th>
-                    <th className="text-center p-3 text-xs font-bold text-[#7a5c3e] uppercase">Emails Sent</th>
-                    <th className="text-center p-3 text-xs font-bold text-[#7a5c3e] uppercase">Status</th>
-                    <th className="text-center p-3 text-xs font-bold text-[#7a5c3e] uppercase">Actions</th>
+                    <th className="p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.length === waitingUsers.length && waitingUsers.length > 0}
+                        onChange={handleSelectAll}
+                        aria-label="Select all users"
+                      />
+                    </th>
+                    <th className="text-left p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase w-8">#</th>
+                    <th className="text-left p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase">Name</th>
+                    <th className="text-left p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase hidden sm:table-cell">Email</th>
+                    <th className="text-left p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase hidden md:table-cell">Phone</th>
+                    <th className="text-left p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase hidden lg:table-cell">Church</th>
+                    <th className="text-left p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase">Code</th>
+                    <th className="text-center p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase">Sent</th>
+                    <th className="text-center p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase hidden md:table-cell">Status</th>
+                    <th className="text-center p-2 md:p-3 text-xs font-bold text-[#7a5c3e] uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {waitingUsers.map((user, index) => {
                     const hasEmailSent = emailsSent.has(user.id);
+                    const isSelected = selectedUserIds.includes(user.id);
                     return (
                       <motion.tr
                         key={user.id}
@@ -331,24 +361,32 @@ export function WaitingListManagement() {
                             : "bg-yellow-50 hover:bg-yellow-100"
                         }`}
                       >
-                        <td className="p-3">
+                        <td className="p-2 md:p-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleSelectUser(user.id)}
+                            aria-label={`Select ${user.full_name}`}
+                          />
+                        </td>
+                        <td className="p-2 md:p-3">
                           <div className={`text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold ${
                             hasEmailSent ? "bg-green-500" : "bg-yellow-500"
                           }`}>
                             {hasEmailSent ? "✓" : index + 1}
                           </div>
                         </td>
-                        <td className="p-3">
-                          <p className="font-semibold text-[#7a5c3e] text-sm">{user.full_name}</p>
+                        <td className="p-2 md:p-3">
+                          <p className="font-semibold text-[#7a5c3e] text-xs md:text-sm truncate">{user.full_name}</p>
                         </td>
-                        <td className="p-3">
-                          <p className="text-[#7a5c3e] text-sm font-mono text-xs">{user.email}</p>
+                        <td className="p-2 md:p-3 hidden sm:table-cell">
+                          <p className="text-[#7a5c3e] text-xs md:text-sm font-mono truncate">{user.email}</p>
                         </td>
-                        <td className="p-3">
-                          <p className="text-[#7a5c3e] text-sm">{user.phone}</p>
+                        <td className="p-2 md:p-3 hidden md:table-cell">
+                          <p className="text-[#7a5c3e] text-xs md:text-sm">{user.phone}</p>
                         </td>
-                        <td className="p-3">
-                          <p className="text-[#7a5c3e] text-sm truncate">{user.church_name}</p>
+                        <td className="p-2 md:p-3 hidden lg:table-cell">
+                          <p className="text-[#7a5c3e] text-xs md:text-sm truncate">{user.church_name}</p>
                         </td>
                         <td className="p-3">
                           <p className="text-[#D4622A] font-mono font-bold text-sm">{user.confirmation_code}</p>
@@ -425,23 +463,25 @@ export function WaitingListManagement() {
 
           {/* Batch Navigation */}
           {stats.total > 0 && (
-            <div className="flex justify-center gap-3 mt-6 pt-6 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-3 mt-6 pt-6 border-t border-gray-200">
               <Button
                 onClick={() => fetchWaitingList(Math.max(0, currentOffset - BATCH_SIZE))}
                 disabled={currentOffset === 0}
-                className="bg-gray-300 hover:bg-gray-400 text-gray-900 px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                className="w-full sm:w-auto bg-gray-300 hover:bg-gray-400 text-gray-900 px-3 sm:px-4 py-2 rounded-lg font-semibold disabled:opacity-50 text-sm sm:text-base"
               >
-                ← Previous Batch
+                <span className="hidden sm:inline">← Previous Batch</span>
+                <span className="sm:hidden">← Prev</span>
               </Button>
-              <span className="px-4 py-2 bg-gray-100 rounded-lg text-[#7a5c3e] font-semibold">
+              <span className="px-3 sm:px-4 py-2 bg-gray-100 rounded-lg text-[#7a5c3e] font-semibold text-xs sm:text-base whitespace-nowrap">
                 Batch {currentPage} of {totalPages}
               </span>
               <Button
                 onClick={() => fetchWaitingList(currentOffset + BATCH_SIZE)}
                 disabled={currentOffset + BATCH_SIZE >= stats.total}
-                className="bg-gray-300 hover:bg-gray-400 text-gray-900 px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                className="w-full sm:w-auto bg-gray-300 hover:bg-gray-400 text-gray-900 px-3 sm:px-4 py-2 rounded-lg font-semibold disabled:opacity-50 text-sm sm:text-base"
               >
-                Next Batch →
+                <span className="hidden sm:inline">Next Batch →</span>
+                <span className="sm:hidden">Next →</span>
               </Button>
             </div>
           )}

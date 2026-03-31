@@ -57,8 +57,18 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
       const data = await response.json();
 
       if (response.ok) {
-        setSearchResults(data.results || []);
-        if (data.results?.length === 0) {
+        // Sort results: Confirmed first, then Waiting
+        const results = data.results || [];
+        const sortedResults = results.sort((a: Registration, b: Registration) => {
+          // Confirmed users first
+          if (a.is_confirmed && !b.is_confirmed) return -1;
+          if (!a.is_confirmed && b.is_confirmed) return 1;
+          // Then by name
+          return a.full_name.localeCompare(b.full_name);
+        });
+        
+        setSearchResults(sortedResults);
+        if (sortedResults.length === 0) {
           setErrorMessage("No users found matching your search.");
         }
       } else {
@@ -243,41 +253,41 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
                         }`}
                         onClick={() => result.is_confirmed && !result.attended && setSelectedUser(result)}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <p className="font-semibold text-[#7a5c3e]">{result.full_name}</p>
-                            <p className="text-sm text-[#bfa98c]">{result.email}</p>
+                        <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[#7a5c3e] truncate">{result.full_name}</p>
+                            <p className="text-sm text-[#bfa98c] truncate">{result.email}</p>
                             <p className="text-sm text-[#bfa98c]">{result.phone}</p>
-                            <p className="text-xs text-[#7a5c3e] mt-2 font-mono">Code: {result.confirmation_code}</p>
+                            <p className="text-xs text-[#7a5c3e] mt-2 font-mono break-all">Code: {result.confirmation_code}</p>
                             
                             {/* Status Badges */}
-                            <div className="mt-3 flex flex-wrap gap-2">
+                            <div className="mt-3 flex flex-wrap gap-1 sm:gap-2">
                               {result.waiting_list_turn !== null && result.waiting_list_turn !== undefined && (
-                                <span className="inline-block px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold">
+                                <span className="inline-block px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold whitespace-nowrap">
                                   🔔 WL #{result.waiting_list_turn}
                                 </span>
                               )}
                               {result.is_confirmed && (
-                                <span className="inline-block px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">
+                                <span className="inline-block px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold whitespace-nowrap">
                                   ✓ Confirmed
                                 </span>
                               )}
                             </div>
                           </div>
                           {result.attended ? (
-                            <div className="flex items-center gap-2 bg-green-100 px-3 py-1 rounded-full flex-shrink-0">
+                            <div className="flex items-center gap-1 sm:gap-2 bg-green-100 px-2 sm:px-3 py-1 rounded-full flex-shrink-0">
                               <CheckCircle2 className="w-4 h-4 text-green-600" />
-                              <span className="text-xs font-bold text-green-600">Checked In</span>
+                              <span className="text-xs font-bold text-green-600 whitespace-nowrap">Checked In</span>
                             </div>
                           ) : result.is_confirmed ? (
-                            <div className="flex items-center gap-2 bg-blue-100 px-3 py-1 rounded-full flex-shrink-0">
+                            <div className="flex items-center gap-1 sm:gap-2 bg-blue-100 px-2 sm:px-3 py-1 rounded-full flex-shrink-0">
                               <CheckCircle2 className="w-4 h-4 text-blue-600" />
-                              <span className="text-xs font-bold text-blue-600">✅ Ready</span>
+                              <span className="text-xs font-bold text-blue-600 whitespace-nowrap">✅ Ready</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2 bg-orange-100 px-3 py-1 rounded-full flex-shrink-0">
+                            <div className="flex items-center gap-1 sm:gap-2 bg-orange-100 px-2 sm:px-3 py-1 rounded-full flex-shrink-0">
                               <Clock className="w-4 h-4 text-orange-600" />
-                              <span className="text-xs font-bold text-orange-600">⏳ Waiting</span>
+                              <span className="text-xs font-bold text-orange-600 whitespace-nowrap">⏳ Waiting</span>
                             </div>
                           )}
                         </div>
