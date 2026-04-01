@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       .from("registrations")
       .select("*")
       .eq("id", id)
+      .eq("is_deleted", false) // Ensure not deleted
       .single();
 
     if (fetchError || !user) {

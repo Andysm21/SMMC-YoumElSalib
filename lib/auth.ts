@@ -4,6 +4,7 @@ const ADMIN_CREDENTIALS: AdminUser[] = [
   { username: "andrew", password: "andrew123", role: "admin" },
   { username: "door1", password: "door1", role: "door" },
   { username: "door2", password: "door2", role: "door" },
+  { username: "door4", password: "door4", role: "door" },
   { username: "door3", password: "door3", role: "door" },
 ];
 

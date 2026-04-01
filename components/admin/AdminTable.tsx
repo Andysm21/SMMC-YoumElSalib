@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, XCircle, Send, Loader, Edit3 } from "lucide-react";
+import { CheckCircle2, XCircle, Send, Loader, Edit3, Trash2 } from "lucide-react";
+import DeleteConfirmDialog from "./DeleteConfirmDialog";
 
 interface Registration {
   id: string;
@@ -44,6 +45,12 @@ export default function AdminTable({ registrations, isLoading, error, adminKey: 
   const [editingRoleReg, setEditingRoleReg] = useState<Registration | null>(null);
   const [newRole, setNewRole] = useState<string>("");
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ show: boolean; name: string; id: string }>({
+    show: false,
+    name: "",
+    id: "",
+  });
 
   // Handlers must be defined before return
   const handleSendEmail = async (registration: Registration) => {
@@ -204,8 +211,45 @@ export default function AdminTable({ registrations, isLoading, error, adminKey: 
     }
   };
 
+  const handleDeleteUser = async (registrationId: string) => {
+    setDeletingId(registrationId);
+    try {
+      const response = await fetch("/api/admin/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: registrationId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete user: ${response.statusText}`);
+      }
+
+      setDeleteDialog({ show: false, name: "", id: "" });
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      throw error;
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <>
+      {/* Delete Confirmation Dialog */}
+      {deleteDialog.show && (
+        <DeleteConfirmDialog
+          userName={deleteDialog.name}
+          onConfirm={() => handleDeleteUser(deleteDialog.id)}
+          onCancel={() => setDeleteDialog({ show: false, name: "", id: "" })}
+        />
+      )}
+
       {/* Role Edit Modal */}
       {editingRoleId && editingRoleReg && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -418,6 +462,25 @@ export default function AdminTable({ registrations, isLoading, error, adminKey: 
                         >
                           <Edit3 className="w-3 h-3" />
                           <span className="hidden sm:inline">Role</span>
+                        </button>
+                        <button
+                          onClick={() =>
+                            setDeleteDialog({
+                              show: true,
+                              name: registration.full_name,
+                              id: registration.id,
+                            })
+                          }
+                          disabled={deletingId === registration.id}
+                          className="px-2 py-1 rounded text-xs font-bold flex items-center gap-1 bg-red-500 text-white hover:bg-red-600 transition whitespace-nowrap disabled:opacity-50"
+                          title="Delete user"
+                        >
+                          {deletingId === registration.id ? (
+                            <Loader className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3 h-3" />
+                          )}
+                          <span className="hidden sm:inline">Delete</span>
                         </button>
                       </div>
                     </td>

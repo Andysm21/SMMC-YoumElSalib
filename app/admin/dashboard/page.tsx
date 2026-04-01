@@ -10,6 +10,7 @@ import AdminTable from "@/components/admin/AdminTable";
 import RegistrationStatusModal from "@/components/admin/RegistrationStatusModal";
 import { EmailQuotaCard } from "@/components/admin/EmailQuotaCard";
 import { WaitingListManagement } from "@/components/admin/WaitingListManagement";
+import AddRegistrationModal from "@/components/admin/AddRegistrationModal";
 import { LogOut, Users, Pause, Play, CheckCircle2, Menu, X } from "lucide-react";
 
 interface Registration {
@@ -59,6 +60,8 @@ export default function AdminDashboard() {
   const [adminKey, setAdminKey] = useState<string>("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showAddRegistration, setShowAddRegistration] = useState(false);
+  const [isGeneratingTestData, setIsGeneratingTestData] = useState(false);
 
   useEffect(() => {
     const session = getSession();
@@ -332,6 +335,36 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleGenerateTestData = async () => {
+    if (!confirm("Generate 10 test users? This will create both confirmed and waiting list users.")) {
+      return;
+    }
+
+    setIsGeneratingTestData(true);
+    try {
+      const response = await fetch("/api/admin/generate-test-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ count: 10 }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to generate test data");
+      }
+
+      alert(`✅ Generated ${data.count} test users`);
+      fetchRegistrations();
+    } catch (error) {
+      alert(`❌ Failed to generate test data: ${String(error)}`);
+    } finally {
+      setIsGeneratingTestData(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f8f6f2] via-[#f3e9e0] to-[#f8f6f2] flex flex-col md:flex-row">
       {/* Sidebar - Hidden on mobile, visible on desktop */}
@@ -416,6 +449,21 @@ export default function AdminDashboard() {
 
         {/* Footer in Sidebar */}
         <div className="p-4 border-t border-[#e2c9b0] space-y-2">
+          <button
+            onClick={() => setShowAddRegistration(true)}
+            className="w-full px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg font-bold text-xs transition-all flex items-center justify-center"
+            title="Add Person"
+          >
+            {sidebarCollapsed ? "➕" : "➕ Add Person"}
+          </button>
+          <button
+            onClick={handleGenerateTestData}
+            disabled={isGeneratingTestData}
+            className="w-full px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg font-bold text-xs transition-all flex items-center justify-center disabled:opacity-50"
+            title="Generate Test Data"
+          >
+            {sidebarCollapsed ? "🧪" : isGeneratingTestData ? "🔄 Generating..." : "🧪 Test Data"}
+          </button>
           <button
             onClick={() => setShowStatusModal(true)}
             className="w-full px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg font-bold text-xs transition-all flex items-center justify-center"
@@ -829,6 +877,17 @@ export default function AdminDashboard() {
         currentStatus={registrationStatus}
         onStatusChange={handleUpdateRegistrationStatus}
       />
+
+      {/* Add Registration Modal */}
+      {showAddRegistration && (
+        <AddRegistrationModal
+          onClose={() => setShowAddRegistration(false)}
+          onSuccess={() => {
+            setShowAddRegistration(false);
+            fetchRegistrations();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from("registrations")
-      .select("*", { count: "exact" });
+      .select("*", { count: "exact" })
+      .eq("is_deleted", false); // Always filter out deleted users
 
     // Handle waiting list filter
     if (waitingListFilter === "waiting-unconfirmed") {

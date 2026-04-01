@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find the registration
-    let query = supabaseAdmin.from("registrations").select("*");
+    let query = supabaseAdmin.from("registrations").select("*").eq("is_deleted", false);
 
     if (id) {
       query = query.eq("id", id);
@@ -46,7 +46,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update the registration to mark as attended
+    // Check if already attended
+    if (registrations.attended) {
+      return NextResponse.json(
+        { 
+          error: "Already checked in",
+          message: `${registrations.full_name} was already checked in at ${new Date(registrations.attended_at).toLocaleTimeString()}`,
+          data: registrations,
+        },
+        { status: 409 }
+      );
+    }
+
+    // Update the registration to mark as attended - ONLY if attended is false
     const now = new Date().toISOString();
     const { data: updated, error: updateError } = await supabaseAdmin
       .from("registrations")
@@ -55,10 +67,22 @@ export async function POST(request: NextRequest) {
         attended_at: now,
       })
       .eq("id", registrations.id)
+      .eq("attended", false)  // CRITICAL: Only update if not already attended
       .select()
       .single();
 
     if (updateError) {
+      // Check if no rows were updated (already attended)
+      if (updateError.code === "PGRST116") {
+        return NextResponse.json(
+          { 
+            error: "Already checked in",
+            message: `${registrations.full_name} was already checked in`,
+            data: registrations,
+          },
+          { status: 409 }
+        );
+      }
       console.error("Update error:", updateError);
       return NextResponse.json(
         { error: "Failed to update attendance" },

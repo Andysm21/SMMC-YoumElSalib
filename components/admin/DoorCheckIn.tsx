@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, LogOut, CheckCircle2, Clock, AlertCircle, Loader } from "lucide-react";
+import { Search, LogOut, CheckCircle2, Clock, AlertCircle, Loader, Camera, X } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+import Tesseract from "tesseract.js";
 
 interface Registration {
   id: string;
@@ -33,8 +35,64 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
   const [checkedInUsers, setCheckedInUsers] = useState<Set<string>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  
+  // OCR Camera State
+  const [showCamera, setShowCamera] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isOCRProcessing, setIsOCRProcessing] = useState(false);
+  const cameraRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  
+  // Supabase Realtime
+  const supabaseRef = useRef<any>(null);
+  const subscriptionRef = useRef<any>(null);
 
-  // Debounced search
+  // Initialize Supabase Realtime
+  useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseAnonKey) {
+      supabaseRef.current = createClient(supabaseUrl, supabaseAnonKey);
+      
+      // Subscribe to real-time updates on the registrations table
+      subscriptionRef.current = supabaseRef.current
+        .channel("registrations-updates")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "registrations",
+            filter: "attended=eq.true",
+          },
+          (payload: any) => {
+            // Update the locally checked-in users
+            const updatedRegistration = payload.new;
+            setCheckedInUsers((prev) => new Set([...prev, updatedRegistration.id]));
+            
+            // Update search results if visible
+            setSearchResults((prev) =>
+              prev.map((r) =>
+                r.id === updatedRegistration.id
+                  ? { ...r, attended: true, attended_at: updatedRegistration.attended_at }
+                  : r
+              )
+            );
+          }
+        )
+        .subscribe();
+    }
+    
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
+    };
+  }, []);
+
+  // Debounced search - 300ms delay
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery.trim()) {
@@ -42,7 +100,7 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
       } else {
         setSearchResults([]);
       }
-    }, 500);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -136,6 +194,9 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
         // Handle backend validation errors (e.g., 403 for unconfirmed)
         if (response.status === 403) {
           setErrorMessage("❌ This person is on the waiting list and cannot check in yet. They must be confirmed first.");
+        } else if (response.status === 409) {
+          setErrorMessage("⚠️ This person has already checked in.");
+          setCheckedInUsers(new Set([...checkedInUsers, registration.id]));
         } else {
           setErrorMessage(data.error || "Failed to check in user");
         }
@@ -145,6 +206,81 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
       console.error("Check-in error:", error);
     } finally {
       setIsCheckingIn(false);
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      setIsCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      
+      if (cameraRef.current) {
+        cameraRef.current.srcObject = stream;
+        streamRef.current = stream;
+      }
+    } catch (error) {
+      setErrorMessage("Failed to access camera. Please check permissions.");
+      setIsCameraActive(false);
+      console.error("Camera error:", error);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const captureAndScanCode = async () => {
+    if (!cameraRef.current || !canvasRef.current) return;
+
+    setIsOCRProcessing(true);
+    setErrorMessage("");
+
+    try {
+      const context = canvasRef.current.getContext("2d");
+      if (!context) throw new Error("Canvas context failed");
+
+      // Capture frame from video
+      canvasRef.current.width = cameraRef.current.videoWidth;
+      canvasRef.current.height = cameraRef.current.videoHeight;
+      context.drawImage(cameraRef.current, 0, 0);
+
+      // Perform OCR on the captured image
+      const result = await Tesseract.recognize(canvasRef.current, "eng", {
+        logger: (m) => {
+          // Optional: Log progress
+        },
+      });
+
+      // Extract text and look for confirmation code pattern
+      const extractedText = result.data.text.toUpperCase();
+      
+      // Look for 6-10 character alphanumeric codes (typical confirmation code format)
+      const codePattern = /[A-Z0-9]{6,10}/g;
+      const codes = extractedText.match(codePattern) || [];
+
+      if (codes.length > 0) {
+        // Use the first detected code
+        const detectedCode = codes[0];
+        if (detectedCode) {
+          setSearchQuery(detectedCode);
+          setErrorMessage("");
+          setShowCamera(false);
+          stopCamera();
+        }
+      } else {
+        setErrorMessage("No confirmation code detected. Please try again or search manually.");
+      }
+    } catch (error) {
+      setErrorMessage("OCR scan failed. Please try again or search manually.");
+      console.error("OCR error:", error);
+    } finally {
+      setIsOCRProcessing(false);
     }
   };
 
@@ -191,16 +327,92 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
                   <label className="block text-[#7a5c3e] font-semibold mb-3">
                     Search Attendee
                   </label>
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#D4622A]" />
-                    <Input
-                      type="text"
-                      placeholder="Enter code, email, phone, or name"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-12 py-3 text-lg bg-[#f8f6f2] border-[#e2c9b0] text-[#7a5c3e] placeholder:text-[#bfa98c] focus:border-[#D4622A] rounded-xl"
-                    />
+                  <div className="flex gap-3 items-stretch">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#D4622A]" />
+                      <Input
+                        type="text"
+                        placeholder="Enter code, email, phone, or name"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-12 py-3 text-lg bg-[#f8f6f2] border-[#e2c9b0] text-[#7a5c3e] placeholder:text-[#bfa98c] focus:border-[#D4622A] rounded-xl"
+                      />
+                    </div>
+                    <Button
+                      onClick={() => {
+                        if (showCamera) {
+                          setShowCamera(false);
+                          stopCamera();
+                        } else {
+                          setShowCamera(true);
+                          startCamera();
+                        }
+                      }}
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-3 rounded-xl font-semibold shadow-md transition-all duration-300 flex items-center gap-2"
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span className="hidden sm:inline">Scan</span>
+                    </Button>
                   </div>
+                  
+                  {/* Camera Modal */}
+                  {showCamera && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4 bg-black rounded-xl overflow-hidden shadow-lg border-2 border-blue-500"
+                    >
+                      <div className="relative">
+                        <video
+                          ref={cameraRef}
+                          autoPlay
+                          playsInline
+                          className="w-full aspect-video object-cover"
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+                        
+                        {/* Camera Controls */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-between p-4 pointer-events-none">
+                          <div className="self-end pointer-events-auto">
+                            <button
+                              onClick={() => {
+                                setShowCamera(false);
+                                stopCamera();
+                              }}
+                              className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                          
+                          <div className="flex flex-col gap-3 pointer-events-auto">
+                            <Button
+                              onClick={captureAndScanCode}
+                              disabled={isOCRProcessing}
+                              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all duration-300 flex items-center gap-2"
+                            >
+                              {isOCRProcessing ? (
+                                <>
+                                  <Loader className="w-5 h-5 animate-spin" />
+                                  Scanning...
+                                </>
+                              ) : (
+                                <>
+                                  <Camera className="w-5 h-5" />
+                                  Capture & Scan
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Crosshair Overlay */}
+                        <div className="absolute inset-0 border-4 border-green-500 pointer-events-none" style={{ 
+                          boxShadow: 'inset 0 0 0 9999px rgba(0, 0, 0, 0.3)'
+                        }} />
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
 
                 {/* Error Message */}

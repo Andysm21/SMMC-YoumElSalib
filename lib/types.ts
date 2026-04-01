@@ -92,6 +92,9 @@ export type Registration = {
   waiting_list_turn?: number | null;
   status?: RegistrationStatus; // "confirmed", "waiting", "cancelled"
   email_sent_count?: number; // tracks emails sent to this user
+  source?: "public" | "admin"; // registration source
+  notes?: string | null; // internal notes
+  is_deleted?: boolean; // soft delete flag
 };
 
 export type EmailLog = {
