@@ -41,6 +41,8 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isOCRProcessing, setIsOCRProcessing] = useState(false);
   const [cameraZoom, setCameraZoom] = useState(1);
+  const [detectedCode, setDetectedCode] = useState("");
+  const [showDetectedCodeInput, setShowDetectedCodeInput] = useState(false);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -116,8 +118,24 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
       const data = await response.json();
 
       if (response.ok) {
+        let results = data.results || [];
+        
+        // If no results found and query looks like a code (at least 3 chars), try partial matching
+        if (results.length === 0 && searchQuery.length >= 3) {
+          console.log("No exact match found, trying partial code matching...");
+          const partialResponse = await fetch(
+            `/api/admin/search?q=${encodeURIComponent(searchQuery)}&partial=true`
+          );
+          const partialData = await partialResponse.json();
+          if (partialResponse.ok) {
+            results = partialData.results || [];
+            if (results.length > 0) {
+              console.log(`✅ Found ${results.length} result(s) using partial matching`);
+            }
+          }
+        }
+
         // Sort results: Confirmed first, then Waiting
-        const results = data.results || [];
         const sortedResults = results.sort((a: Registration, b: Registration) => {
           // Confirmed users first
           if (a.is_confirmed && !b.is_confirmed) return -1;
@@ -305,11 +323,46 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
     context.putImageData(imageData, 0, 0);
   };
 
+  // Normalize OCR text: fix common mistakes and clean up
+  const normalizeOCRText = (text: string): string => {
+    return text
+      .toUpperCase()
+      .replace(/\s+/g, "") // Remove all spaces
+      .replace(/[^A-Z0-9_]/g, "") // Remove special characters except underscore
+      // Fix common OCR mistakes:
+      // 0 looks like O
+      .replace(/0/g, "O")
+      // 1 looks like I
+      .replace(/1/g, "I")
+      // 8 looks like B
+      .replace(/8/g, "B");
+  };
+
+  // Extract confirmation code using fuzzy matching
+  const extractConfirmationCode = (text: string): string | null => {
+    // Fuzzy pattern: YM[5S]L[B8](?:_W|_)?[A-Z0-9]{3,10}
+    // This catches:
+    // - YMSLB00001, YMSLB_W00001 (standard)
+    // - YM5LB00001 (5 instead of S)
+    // - YMSB00001 (B instead of 8)
+    // etc.
+    const fuzzyPattern = /YM[5S]L[B8](?:_W|_)?[A-Z0-9]{3,10}/g;
+    const matches = text.match(fuzzyPattern);
+
+    if (matches && matches.length > 0) {
+      // Return the first match
+      return matches[0];
+    }
+
+    return null;
+  };
+
   const captureAndScanCode = async () => {
     if (!cameraRef.current || !canvasRef.current) return;
 
     setIsOCRProcessing(true);
     setErrorMessage("");
+    setDetectedCode("");
 
     try {
       const context = canvasRef.current.getContext("2d");
@@ -338,58 +391,33 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
         },
       });
 
-      // Extract text and normalize it
-      let extractedText = result.data.text.toUpperCase();
-      console.log("Raw OCR text:", result.data.text);
-      console.log("Uppercase text:", extractedText);
-      
-      // Try multiple pattern variations to catch different formats
-      // Pattern 1: YMSLB with underscores (YMSLB_00124, YMSLB_W00001, etc)
-      const pattern1 = /YMSLB[_]?[A-Z0-9]{2,10}/g;
-      // Pattern 2: YMSLB without strict underscore requirements (catches YMSLB00124, YMSBL00124, etc)
-      const pattern2 = /YM[A-Z]*LB[A-Z0-9_]{2,10}/g;
-      // Pattern 3: Just YMSLB followed by numbers/letters (most permissive)
-      const pattern3 = /YMSLB\s*[A-Z0-9_\s-]{2,15}/g;
-      
-      let codes: string[] = [];
-      const match1 = extractedText.match(pattern1);
-      if (match1 && match1.length > 0) {
-        codes = match1;
-      } else {
-        const match2 = extractedText.match(pattern2);
-        if (match2 && match2.length > 0) {
-          codes = match2;
-        } else {
-          const match3 = extractedText.match(pattern3);
-          if (match3 && match3.length > 0) {
-            codes = match3.map(code => code.replace(/[\s-]/g, '')).filter(code => code.length >= 8);
-          }
-        }
-      }
-      
-      console.log("Detected codes:", codes);
+      // Extract raw text
+      const rawText = result.data.text || "";
+      console.log("Raw OCR text:", rawText);
 
-      if (codes.length > 0) {
-        // Use the first detected code, clean it up
-        let detectedCode = codes[0];
-        // Remove extra spaces and dashes
-        detectedCode = detectedCode.replace(/[\s-]/g, '');
-        // Ensure it starts with YMSLB
-        if (detectedCode.startsWith('YMSLB')) {
-          setSearchQuery(detectedCode);
-          setErrorMessage("");
-          setShowCamera(false);
-          stopCamera();
-          console.log("✅ Code detected and set:", detectedCode);
-        } else {
-          setErrorMessage("No valid confirmation code detected. Please try again or search manually.");
-          console.log("❌ Code found but invalid format:", detectedCode);
-        }
+      // Normalize the text (uppercase, remove spaces, fix common mistakes)
+      const normalizedText = normalizeOCRText(rawText);
+      console.log("Normalized text:", normalizedText);
+
+      // Extract confirmation code using fuzzy pattern
+      const extractedCode = extractConfirmationCode(normalizedText);
+      console.log("Extracted code:", extractedCode);
+
+      if (extractedCode) {
+        // Show the detected code for user to review/edit
+        setDetectedCode(extractedCode);
+        setShowDetectedCodeInput(true);
+        setErrorMessage("");
+        console.log("✅ Code detected:", extractedCode);
       } else {
-        setErrorMessage("No valid confirmation code detected. Please try again or search manually.");
-        console.log("❌ No codes matched any pattern");
+        setDetectedCode("");
+        setShowDetectedCodeInput(false);
+        setErrorMessage("Could not detect code clearly. Please try again or enter manually.");
+        console.log("❌ No code matched the fuzzy pattern");
       }
     } catch (error) {
+      setDetectedCode("");
+      setShowDetectedCodeInput(false);
       setErrorMessage("OCR scan failed. Please try again or search manually.");
       console.error("OCR error:", error);
     } finally {
@@ -545,6 +573,48 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
                     </motion.div>
                   )}
                 </div>
+
+                {/* Detected Code Input - Show after OCR scan */}
+                {showDetectedCodeInput && detectedCode && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-6"
+                  >
+                    <p className="text-sm font-semibold text-blue-900 mb-3">
+                      📱 Detected Code (edit if needed):
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={detectedCode}
+                        onChange={(e) => setDetectedCode(e.target.value.toUpperCase())}
+                        className="flex-1 py-2 px-3 text-base font-mono bg-white border-blue-300 text-blue-900 placeholder:text-blue-400 focus:border-blue-500"
+                      />
+                      <Button
+                        onClick={() => {
+                          setSearchQuery(detectedCode);
+                          setShowDetectedCodeInput(false);
+                          setDetectedCode("");
+                          setShowCamera(false);
+                          stopCamera();
+                        }}
+                        className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all"
+                      >
+                        Search
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowDetectedCodeInput(false);
+                          setDetectedCode("");
+                        }}
+                        className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-bold shadow-md transition-all"
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Error Message */}
                 {errorMessage && (
