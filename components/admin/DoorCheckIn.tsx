@@ -43,9 +43,12 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
   const [cameraZoom, setCameraZoom] = useState(1);
   const [detectedCode, setDetectedCode] = useState("");
   const [showDetectedCodeInput, setShowDetectedCodeInput] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const tesseractRef = useRef<any>(null);
   
   // Supabase Realtime
   const supabaseRef = useRef<any>(null);
@@ -94,6 +97,20 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
       }
     };
   }, []);
+
+  // Cleanup effect - stop camera and scanning when component unmounts
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  // Stop scanning when camera is closed
+  useEffect(() => {
+    if (!showCamera) {
+      stopCamera();
+    }
+  }, [showCamera]);
 
   // Debounced search - 300ms delay
   useEffect(() => {
@@ -238,6 +255,12 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
       if (cameraRef.current) {
         cameraRef.current.srcObject = stream;
         streamRef.current = stream;
+        
+        // Start continuous frame scanning after camera is ready
+        setTimeout(() => {
+          setIsScanning(true);
+          startContinuousScanning();
+        }, 500);
       }
     } catch (error) {
       setErrorMessage("Failed to access camera. Please check permissions.");
@@ -246,7 +269,90 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
     }
   };
 
+  // Continuous frame scanning - captures and scans frame every 300ms
+  const startContinuousScanning = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+    }
+
+    scanIntervalRef.current = setInterval(async () => {
+      if (!cameraRef.current || !canvasRef.current || !isScanning) return;
+
+      try {
+        const context = canvasRef.current.getContext("2d");
+        if (!context) return;
+
+        // Capture current frame
+        canvasRef.current.width = cameraRef.current.videoWidth;
+        canvasRef.current.height = cameraRef.current.videoHeight;
+        context.drawImage(cameraRef.current, 0, 0);
+
+        // Get image data
+        const imageData = context.getImageData(
+          0,
+          0,
+          canvasRef.current.width,
+          canvasRef.current.height
+        );
+
+        // Quick preprocessing - just grayscale
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+          data[i] = gray;
+          data[i + 1] = gray;
+          data[i + 2] = gray;
+        }
+
+        context.putImageData(imageData, 0, 0);
+
+        // Run OCR with character whitelist for speed
+        const result = await Tesseract.recognize(canvasRef.current, "eng", {
+          logger: (m: any) => {}, // Suppress logger output
+        } as any);
+
+        const rawText = result.data.text || "";
+        
+        // Use strict pattern matching for continuous scanning
+        const codePattern = /YMSLB(?:_W|_)?[A-Z0-9]{4,10}/g;
+        const matches = rawText.match(codePattern);
+
+        if (matches && matches.length > 0) {
+          const detectedCode = matches[0];
+          
+          // Found a code - stop scanning and set it
+          stopCamera();
+          setDetectedCode(detectedCode);
+          setSearchQuery(detectedCode);
+          setShowCamera(false);
+          setIsScanning(false);
+          
+          console.log("✅ Code detected and auto-searching:", detectedCode);
+          
+          // Trigger search automatically
+          setTimeout(() => {
+            handleSearch();
+          }, 100);
+        }
+      } catch (error) {
+        // Silently skip frame if OCR fails - don't interrupt scanning
+        console.debug("Frame scan error (continuing):", error instanceof Error ? error.message : error);
+      }
+    }, 300); // Scan every 300ms
+  };
+
   const stopCamera = () => {
+    // Stop scanning interval
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    setIsScanning(false);
+
+    // Stop video stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -515,6 +621,19 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
                         
                         {/* Camera Controls */}
                         <div className="absolute inset-0 flex flex-col items-center justify-between p-4 pointer-events-none">
+                          <div className="self-start pointer-events-auto">
+                            {isScanning && (
+                              <motion.div
+                                animate={{ opacity: [1, 0.5, 1] }}
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                                className="bg-green-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg flex items-center gap-2"
+                              >
+                                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                                Scanning...
+                              </motion.div>
+                            )}
+                          </div>
+
                           <div className="self-end pointer-events-auto flex gap-2">
                             <button
                               onClick={() => setCameraZoom(Math.max(1, cameraZoom - 0.2))}
@@ -558,16 +677,31 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
                               ) : (
                                 <>
                                   <Camera className="w-5 h-5" />
-                                  Capture & Scan
+                                  Manual Scan
                                 </>
                               )}
                             </Button>
                           </div>
                         </div>
                         
+                        {/* Guide Overlay Box */}
+                        <div className="absolute inset-0 pointer-events-none">
+                          {/* Center guide box */}
+                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                            <div className="w-64 h-32 border-2 border-yellow-400 rounded-lg" style={{
+                              boxShadow: 'inset 0 0 10px rgba(250, 204, 21, 0.3)'
+                            }} />
+                          </div>
+                          
+                          {/* Darkened areas outside guide box */}
+                          <div className="absolute inset-0" style={{
+                            background: 'radial-gradient(ellipse 320px 160px at center, transparent 0%, rgba(0, 0, 0, 0.3) 100%)'
+                          }} />
+                        </div>
+
                         {/* Crosshair Overlay */}
                         <div className="absolute inset-0 border-4 border-green-500 pointer-events-none" style={{ 
-                          boxShadow: 'inset 0 0 0 9999px rgba(0, 0, 0, 0.3)'
+                          boxShadow: 'inset 0 0 0 9999px rgba(0, 0, 0, 0.2)'
                         }} />
                       </div>
                     </motion.div>
