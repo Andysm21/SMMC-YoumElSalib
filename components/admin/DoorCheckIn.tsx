@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, LogOut, CheckCircle2, Clock, AlertCircle, Loader, Camera, X, User, Mail, Phone, Building2 } from "lucide-react";
+import { Search, LogOut, CheckCircle2, Clock, AlertCircle, Loader, Camera, X, User, Mail, Phone, Building2, ZoomIn, ZoomOut } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import Tesseract from "tesseract.js";
 
@@ -40,6 +40,7 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
   const [showCamera, setShowCamera] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isOCRProcessing, setIsOCRProcessing] = useState(false);
+  const [cameraZoom, setCameraZoom] = useState(1);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -257,27 +258,56 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
         },
       });
 
-      // Extract text and clean it
+      // Extract text and normalize it
       let extractedText = result.data.text.toUpperCase();
-      // Remove spaces and special characters (keep only alphanumeric, underscore for YMSLB_W format)
-      extractedText = extractedText.replace(/[^\w]/g, '');
+      console.log("Raw OCR text:", result.data.text);
+      console.log("Uppercase text:", extractedText);
       
-      // Strict regex pattern for valid confirmation codes:
-      // YMSLB followed by optional "_" or "_W", then 4-10 alphanumeric characters
-      const codePattern = /(YMSLB(?:_W|_)?[A-Z0-9]{4,10})/g;
-      const codes = extractedText.match(codePattern) || [];
+      // Try multiple pattern variations to catch different formats
+      // Pattern 1: YMSLB with underscores (YMSLB_00124, YMSLB_W00001, etc)
+      const pattern1 = /YMSLB[_]?[A-Z0-9]{2,10}/g;
+      // Pattern 2: YMSLB without strict underscore requirements (catches YMSLB00124, YMSBL00124, etc)
+      const pattern2 = /YM[A-Z]*LB[A-Z0-9_]{2,10}/g;
+      // Pattern 3: Just YMSLB followed by numbers/letters (most permissive)
+      const pattern3 = /YMSLB\s*[A-Z0-9_\s-]{2,15}/g;
+      
+      let codes: string[] = [];
+      const match1 = extractedText.match(pattern1);
+      if (match1 && match1.length > 0) {
+        codes = match1;
+      } else {
+        const match2 = extractedText.match(pattern2);
+        if (match2 && match2.length > 0) {
+          codes = match2;
+        } else {
+          const match3 = extractedText.match(pattern3);
+          if (match3 && match3.length > 0) {
+            codes = match3.map(code => code.replace(/[\s-]/g, '')).filter(code => code.length >= 8);
+          }
+        }
+      }
+      
+      console.log("Detected codes:", codes);
 
       if (codes.length > 0) {
-        // Use the first detected code
-        const detectedCode = codes[0];
-        if (detectedCode) {
+        // Use the first detected code, clean it up
+        let detectedCode = codes[0];
+        // Remove extra spaces and dashes
+        detectedCode = detectedCode.replace(/[\s-]/g, '');
+        // Ensure it starts with YMSLB
+        if (detectedCode.startsWith('YMSLB')) {
           setSearchQuery(detectedCode);
           setErrorMessage("");
           setShowCamera(false);
           stopCamera();
+          console.log("✅ Code detected and set:", detectedCode);
+        } else {
+          setErrorMessage("No valid confirmation code detected. Please try again or search manually.");
+          console.log("❌ Code found but invalid format:", detectedCode);
         }
       } else {
         setErrorMessage("No valid confirmation code detected. Please try again or search manually.");
+        console.log("❌ No codes matched any pattern");
       }
     } catch (error) {
       setErrorMessage("OCR scan failed. Please try again or search manually.");
@@ -371,12 +401,30 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
                           autoPlay
                           playsInline
                           className="w-full aspect-video object-cover"
+                          style={{ transform: `scale(${cameraZoom})` }}
                         />
                         <canvas ref={canvasRef} className="hidden" />
                         
                         {/* Camera Controls */}
                         <div className="absolute inset-0 flex flex-col items-center justify-between p-4 pointer-events-none">
-                          <div className="self-end pointer-events-auto">
+                          <div className="self-end pointer-events-auto flex gap-2">
+                            <button
+                              onClick={() => setCameraZoom(Math.max(1, cameraZoom - 0.2))}
+                              className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                              title="Zoom Out"
+                            >
+                              <ZoomOut className="w-5 h-5" />
+                            </button>
+                            <span className="bg-blue-500 text-white px-3 py-2 rounded-full text-sm font-bold shadow-lg">
+                              {(cameraZoom * 100).toFixed(0)}%
+                            </span>
+                            <button
+                              onClick={() => setCameraZoom(Math.min(3, cameraZoom + 0.2))}
+                              className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                              title="Zoom In"
+                            >
+                              <ZoomIn className="w-5 h-5" />
+                            </button>
                             <button
                               onClick={() => {
                                 setShowCamera(false);
