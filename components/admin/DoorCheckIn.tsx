@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, LogOut, CheckCircle2, Clock, AlertCircle, Loader, Camera, X } from "lucide-react";
+import { Search, LogOut, CheckCircle2, Clock, AlertCircle, Loader, Camera, X, User, Mail, Phone, Building2 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import Tesseract from "tesseract.js";
 
@@ -257,11 +257,14 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
         },
       });
 
-      // Extract text and look for confirmation code pattern
-      const extractedText = result.data.text.toUpperCase();
+      // Extract text and clean it
+      let extractedText = result.data.text.toUpperCase();
+      // Remove spaces and special characters (keep only alphanumeric, underscore for YMSLB_W format)
+      extractedText = extractedText.replace(/[^\w]/g, '');
       
-      // Look for 6-10 character alphanumeric codes (typical confirmation code format)
-      const codePattern = /[A-Z0-9]{6,10}/g;
+      // Strict regex pattern for valid confirmation codes:
+      // YMSLB followed by optional "_" or "_W", then 4-10 alphanumeric characters
+      const codePattern = /(YMSLB(?:_W|_)?[A-Z0-9]{4,10})/g;
       const codes = extractedText.match(codePattern) || [];
 
       if (codes.length > 0) {
@@ -274,7 +277,7 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
           stopCamera();
         }
       } else {
-        setErrorMessage("No confirmation code detected. Please try again or search manually.");
+        setErrorMessage("No valid confirmation code detected. Please try again or search manually.");
       }
     } catch (error) {
       setErrorMessage("OCR scan failed. Please try again or search manually.");
@@ -526,8 +529,8 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
             </Card>
           </div>
 
-          {/* Sidebar - Selected User Details */}
-          <div>
+          {/* Sidebar - Selected User Details (Desktop Only) */}
+          <div className="hidden lg:block">
             {selectedUser ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -536,7 +539,10 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
               >
                 <Card className="bg-white shadow-xl border-0 rounded-2xl">
                   <CardContent className="p-6">
-                    <h3 className="font-bold text-[#7a5c3e] mb-4 text-lg">Check In Details</h3>
+                    <h3 className="font-bold text-[#7a5c3e] mb-4 text-lg flex items-center gap-2">
+                      <User className="w-5 h-5" />
+                      Check In Details
+                    </h3>
 
                     <div className="space-y-4 mb-6">
                       <div>
@@ -545,23 +551,32 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Email</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Mail className="w-4 h-4 text-[#D4622A]" />
+                          <p className="text-xs font-semibold text-[#bfa98c] uppercase">Email</p>
+                        </div>
                         <p className="text-sm text-[#7a5c3e] break-all">{selectedUser.email}</p>
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Phone</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Phone className="w-4 h-4 text-[#D4622A]" />
+                          <p className="text-xs font-semibold text-[#bfa98c] uppercase">Phone</p>
+                        </div>
                         <p className="text-sm text-[#7a5c3e]">{selectedUser.phone}</p>
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Church</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Building2 className="w-4 h-4 text-[#D4622A]" />
+                          <p className="text-xs font-semibold text-[#bfa98c] uppercase">Church</p>
+                        </div>
                         <p className="text-sm text-[#7a5c3e]">{selectedUser.church_name}</p>
                       </div>
 
                       <div>
                         <p className="text-xs font-semibold text-[#bfa98c] uppercase mb-1">Code</p>
-                        <p className="text-sm font-mono text-[#D4622A] font-bold">{selectedUser.confirmation_code}</p>
+                        <p className="text-sm font-mono text-[#D4622A] font-bold bg-[#f8f6f2] p-2 rounded-lg">{selectedUser.confirmation_code}</p>
                       </div>
 
                       {/* Status Section */}
@@ -666,6 +681,168 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
           </div>
         </motion.div>
       </div>
+
+      {/* Mobile Modal - Selected User Details */}
+      <AnimatePresence>
+        {selectedUser && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedUser(null)}
+            className="fixed inset-0 bg-black/50 z-50 flex items-end lg:hidden"
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="sticky top-0 bg-gradient-to-r from-[#D4622A] to-[#bfa98c] text-white p-4 rounded-t-3xl flex items-center justify-between">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Check In Details
+                </h3>
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* User Info Card */}
+                <div className="bg-gradient-to-br from-[#f8f6f2] to-[#f3e9e0] rounded-2xl p-4 border-2 border-[#D4622A]/20">
+                  <div className="flex items-start gap-4">
+                    <div className="w-14 h-14 rounded-full bg-[#D4622A]/20 flex items-center justify-center flex-shrink-0">
+                      <User className="w-7 h-7 text-[#D4622A]" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-2xl font-bold text-[#7a5c3e]">{selectedUser.full_name}</p>
+                      <p className="text-sm text-[#bfa98c] font-mono mt-1">{selectedUser.confirmation_code}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Info */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 bg-[#f8f6f2] rounded-xl">
+                    <Mail className="w-5 h-5 text-[#D4622A] flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[#bfa98c] uppercase">Email</p>
+                      <p className="text-sm text-[#7a5c3e] break-all">{selectedUser.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-[#f8f6f2] rounded-xl">
+                    <Phone className="w-5 h-5 text-[#D4622A] flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[#bfa98c] uppercase">Phone</p>
+                      <p className="text-sm text-[#7a5c3e]">{selectedUser.phone}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-[#f8f6f2] rounded-xl">
+                    <Building2 className="w-5 h-5 text-[#D4622A] flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[#bfa98c] uppercase">Church</p>
+                      <p className="text-sm text-[#7a5c3e]">{selectedUser.church_name}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Section */}
+                <div className="border-t border-[#e2c9b0] pt-4 space-y-3">
+                  {selectedUser.waiting_list_turn !== null && selectedUser.waiting_list_turn !== undefined && (
+                    <div className="flex items-center gap-2 bg-yellow-50 px-4 py-3 rounded-xl border-2 border-yellow-200">
+                      <span className="text-2xl">⏳</span>
+                      <div>
+                        <p className="font-bold text-yellow-700">On Waiting List</p>
+                        <p className="text-sm text-yellow-600">Position: #{selectedUser.waiting_list_turn}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedUser.is_confirmed ? (
+                    <div className="flex items-center gap-2 bg-green-50 px-4 py-3 rounded-xl border-2 border-green-200">
+                      <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
+                      <div>
+                        <p className="font-bold text-green-700">✅ Confirmed</p>
+                        <p className="text-sm text-green-600">Ready to attend event</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-red-50 px-4 py-3 rounded-xl border-2 border-red-200">
+                      <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                      <div>
+                        <p className="font-bold text-red-700">❌ Not Confirmed</p>
+                        <p className="text-sm text-red-600">Must be confirmed to attend</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Check In Status */}
+                <div className="border-t border-[#e2c9b0] pt-4">
+                  {selectedUser.attended ? (
+                    <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 text-center">
+                      <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-2" />
+                      <p className="font-bold text-green-700 text-lg">Already Checked In</p>
+                      {selectedUser.attended_at && (
+                        <p className="text-sm text-green-600 mt-2">
+                          {new Date(selectedUser.attended_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  ) : !selectedUser.is_confirmed ? (
+                    <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+                        <div>
+                          <p className="font-bold text-red-700 mb-1">Cannot Check In</p>
+                          <p className="text-sm text-red-600">This person is on the waiting list.</p>
+                          <p className="text-sm text-red-500 mt-2 font-semibold">They must be confirmed first before they can attend.</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => handleCheckIn(selectedUser)}
+                      disabled={isCheckingIn || checkedInUsers.has(selectedUser.id)}
+                      className="w-full bg-gradient-to-r from-[#D4622A] to-[#bfa98c] hover:from-[#B84F1E] hover:to-[#d4af37] text-white py-4 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-50 text-lg"
+                    >
+                      {isCheckingIn ? (
+                        <>
+                          <Loader className="w-5 h-5 animate-spin mr-2" />
+                          Checking In...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-6 h-6 mr-2" />
+                          Confirm Attendance
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  className="w-full text-[#D4622A] font-semibold py-3 hover:bg-[#D4622A]/10 rounded-lg transition-colors duration-300 mt-2"
+                >
+                  Close
+                </button>
+
+                {/* Safe bottom padding for mobile */}
+                <div className="h-4" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
