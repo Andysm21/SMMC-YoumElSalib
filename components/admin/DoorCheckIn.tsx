@@ -236,6 +236,184 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
     setIsCameraActive(false);
   };
 
+  // Image preprocessing function to improve OCR accuracy for all fonts
+  const preprocessImageForOCR = (
+    context: CanvasRenderingContext2D,
+    imageData: ImageData,
+    canvas: HTMLCanvasElement
+  ) => {
+    const data = imageData.data;
+
+    // Convert to grayscale and apply contrast enhancement
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Convert to grayscale using luminance formula
+      const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+
+      // Apply contrast enhancement (adaptive histogram equalization)
+      // Boost contrast to make text stand out more
+      const contrast = 1.5; // Increase contrast by 50%
+      const adjustedGray = Math.min(255, Math.max(0, (gray - 128) * contrast + 128));
+
+      data[i] = adjustedGray;
+      data[i + 1] = adjustedGray;
+      data[i + 2] = adjustedGray;
+    }
+
+    // Apply binary thresholding (convert to black and white)
+    // Find optimal threshold using Otsu's method
+    const threshold = calculateOtsuThreshold(data);
+
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = data[i]; // All channels are same after grayscale
+
+      // Apply threshold
+      const bw = gray > threshold ? 255 : 0;
+
+      data[i] = bw;
+      data[i + 1] = bw;
+      data[i + 2] = bw;
+    }
+
+    // Apply morphological operations to clean up the image
+    const imageArray = new Uint8ClampedArray(data.length);
+    imageArray.set(data);
+
+    // Erosion (removes small noise)
+    const eroded = applyErosion(imageArray, canvas.width, canvas.height);
+
+    // Dilation (fills small holes)
+    const dilated = applyDilation(eroded, canvas.width, canvas.height);
+
+    // Copy processed image back to canvas
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = dilated[i];
+      data[i + 1] = dilated[i];
+      data[i + 2] = dilated[i];
+    }
+
+    // Put the processed image data back on canvas
+    context.putImageData(imageData, 0, 0);
+  };
+
+  // Calculate optimal threshold using Otsu's method
+  const calculateOtsuThreshold = (data: Uint8ClampedArray): number => {
+    let histogram = new Array(256).fill(0);
+
+    // Calculate histogram
+    for (let i = 0; i < data.length; i += 4) {
+      histogram[data[i]]++;
+    }
+
+    const total = data.length / 4;
+    let sum = 0;
+    for (let i = 0; i < 256; i++) {
+      sum += i * histogram[i];
+    }
+
+    let sumB = 0;
+    let wB = 0;
+    let maxVariance = 0;
+    let threshold = 0;
+
+    for (let i = 0; i < 256; i++) {
+      wB += histogram[i];
+      if (wB === 0) continue;
+
+      const wF = total - wB;
+      if (wF === 0) break;
+
+      sumB += i * histogram[i];
+
+      const mB = sumB / wB;
+      const mF = (sum - sumB) / wF;
+
+      const variance = wB * wF * Math.pow(mB - mF, 2);
+
+      if (variance > maxVariance) {
+        maxVariance = variance;
+        threshold = i;
+      }
+    }
+
+    return threshold;
+  };
+
+  // Apply erosion (morphological operation)
+  const applyErosion = (
+    data: Uint8ClampedArray,
+    width: number,
+    height: number
+  ): Uint8ClampedArray => {
+    const result = new Uint8ClampedArray(data.length);
+    const kernel = 1; // 3x3 kernel
+
+    for (let y = kernel; y < height - kernel; y++) {
+      for (let x = kernel; x < width - kernel; x++) {
+        let isWhite = true;
+
+        // Check 3x3 neighborhood
+        for (let dy = -kernel; dy <= kernel; dy++) {
+          for (let dx = -kernel; dx <= kernel; dx++) {
+            const idx = ((y + dy) * width + (x + dx)) * 4;
+            if (data[idx] === 0) {
+              isWhite = false;
+              break;
+            }
+          }
+          if (!isWhite) break;
+        }
+
+        const idx = (y * width + x) * 4;
+        result[idx] = isWhite ? 255 : 0;
+        result[idx + 1] = isWhite ? 255 : 0;
+        result[idx + 2] = isWhite ? 255 : 0;
+        result[idx + 3] = 255;
+      }
+    }
+
+    return result;
+  };
+
+  // Apply dilation (morphological operation)
+  const applyDilation = (
+    data: Uint8ClampedArray,
+    width: number,
+    height: number
+  ): Uint8ClampedArray => {
+    const result = new Uint8ClampedArray(data.length);
+    const kernel = 1; // 3x3 kernel
+
+    for (let y = kernel; y < height - kernel; y++) {
+      for (let x = kernel; x < width - kernel; x++) {
+        let isBlack = false;
+
+        // Check 3x3 neighborhood
+        for (let dy = -kernel; dy <= kernel; dy++) {
+          for (let dx = -kernel; dx <= kernel; dx++) {
+            const idx = ((y + dy) * width + (x + dx)) * 4;
+            if (data[idx] === 0) {
+              isBlack = true;
+              break;
+            }
+          }
+          if (isBlack) break;
+        }
+
+        const idx = (y * width + x) * 4;
+        result[idx] = isBlack ? 0 : 255;
+        result[idx + 1] = isBlack ? 0 : 255;
+        result[idx + 2] = isBlack ? 0 : 255;
+        result[idx + 3] = 255;
+      }
+    }
+
+    return result;
+  };
+
   const captureAndScanCode = async () => {
     if (!cameraRef.current || !canvasRef.current) return;
 
@@ -251,7 +429,18 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
       canvasRef.current.height = cameraRef.current.videoHeight;
       context.drawImage(cameraRef.current, 0, 0);
 
-      // Perform OCR on the captured image
+      // Get image data for preprocessing
+      const imageData = context.getImageData(
+        0,
+        0,
+        canvasRef.current.width,
+        canvasRef.current.height
+      );
+
+      // Apply image preprocessing to improve OCR accuracy for all fonts
+      preprocessImageForOCR(context, imageData, canvasRef.current);
+
+      // Perform OCR on the preprocessed image
       const result = await Tesseract.recognize(canvasRef.current, "eng", {
         logger: (m) => {
           // Optional: Log progress
