@@ -6,6 +6,7 @@ const ADMIN_CREDENTIALS: AdminUser[] = [
   { username: "door2", password: "door2", role: "door" },
   { username: "door4", password: "door4", role: "door" },
   { username: "door3", password: "door3", role: "door" },
+  { username: "youki", password: "youki", role: "door" },
 ];
 
 const SESSION_KEY = "admin_session";

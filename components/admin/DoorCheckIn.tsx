@@ -248,6 +248,7 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
   const startCamera = async () => {
     try {
       setIsCameraActive(true);
+      setErrorMessage("");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       });
@@ -256,20 +257,19 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
         cameraRef.current.srcObject = stream;
         streamRef.current = stream;
         
-        // Start continuous frame scanning after camera is ready
-        setTimeout(() => {
-          setIsScanning(true);
-          startContinuousScanning();
-        }, 500);
+        console.log("✅ Camera started successfully");
+        
+        // Don't auto-start continuous scanning - let user choose Manual Scan
+        setIsScanning(false);
       }
     } catch (error) {
-      setErrorMessage("Failed to access camera. Please check permissions.");
+      setErrorMessage("❌ Failed to access camera. Please check permissions and try again.");
       setIsCameraActive(false);
       console.error("Camera error:", error);
     }
   };
 
-  // Continuous frame scanning - captures and scans frame every 300ms
+  // Continuous frame scanning - captures and scans frame every 500ms
   const startContinuousScanning = () => {
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current);
@@ -287,42 +287,31 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
         canvasRef.current.height = cameraRef.current.videoHeight;
         context.drawImage(cameraRef.current, 0, 0);
 
-        // Get image data
-        const imageData = context.getImageData(
-          0,
-          0,
-          canvasRef.current.width,
-          canvasRef.current.height
-        );
-
-        // Quick preprocessing - just grayscale
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-          data[i] = gray;
-          data[i + 1] = gray;
-          data[i + 2] = gray;
-        }
-
-        context.putImageData(imageData, 0, 0);
-
-        // Run OCR with character whitelist for speed
+        // Run OCR directly without heavy preprocessing
         const result = await Tesseract.recognize(canvasRef.current, "eng", {
           logger: (m: any) => {}, // Suppress logger output
         } as any);
 
         const rawText = result.data.text || "";
+        console.log("📷 Frame OCR:", rawText.substring(0, 100));
         
-        // Use strict pattern matching for continuous scanning
-        const codePattern = /YMSLB(?:_W|_)?[A-Z0-9]{4,10}/g;
-        const matches = rawText.match(codePattern);
-
+        // Try multiple patterns
+        const pattern1 = /YMSLB(?:_W|_)?[A-Z0-9]{4,10}/g;
+        const pattern2 = /YM[5S]LB[A-Z0-9_]{4,10}/g;
+        
+        let detectedCode = null;
+        let matches = rawText.match(pattern1);
+        
         if (matches && matches.length > 0) {
-          const detectedCode = matches[0];
-          
+          detectedCode = matches[0];
+        } else {
+          matches = rawText.match(pattern2);
+          if (matches && matches.length > 0) {
+            detectedCode = matches[0];
+          }
+        }
+
+        if (detectedCode) {
           // Found a code - stop scanning and set it
           stopCamera();
           setDetectedCode(detectedCode);
@@ -341,7 +330,7 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
         // Silently skip frame if OCR fails - don't interrupt scanning
         console.debug("Frame scan error (continuing):", error instanceof Error ? error.message : error);
       }
-    }, 300); // Scan every 300ms
+    }, 500); // Scan every 500ms
   };
 
   const stopCamera = () => {
@@ -479,53 +468,86 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
       canvasRef.current.height = cameraRef.current.videoHeight;
       context.drawImage(cameraRef.current, 0, 0);
 
-      // Get image data for preprocessing
-      const imageData = context.getImageData(
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height
-      );
-
-      // Apply image preprocessing to improve OCR accuracy for all fonts
-      preprocessImageForOCR(context, imageData, canvasRef.current);
-
-      // Perform OCR on the preprocessed image
-      const result = await Tesseract.recognize(canvasRef.current, "eng", {
-        logger: (m) => {
-          // Optional: Log progress
-        },
+      console.log("📸 Capturing frame...", {
+        width: canvasRef.current.width,
+        height: canvasRef.current.height,
       });
 
-      // Extract raw text
-      const rawText = result.data.text || "";
-      console.log("Raw OCR text:", rawText);
+      // Perform OCR directly - no complex preprocessing
+      try {
+        const result = await Tesseract.recognize(canvasRef.current, "eng", {
+          logger: (m: any) => {},
+        } as any);
 
-      // Normalize the text (uppercase, remove spaces, fix common mistakes)
-      const normalizedText = normalizeOCRText(rawText);
-      console.log("Normalized text:", normalizedText);
+        const rawText = result.data.text || "";
+        console.log("📋 Raw OCR output:", rawText.substring(0, 200));
 
-      // Extract confirmation code using fuzzy pattern
-      const extractedCode = extractConfirmationCode(normalizedText);
-      console.log("Extracted code:", extractedCode);
+        // Normalize text for better matching
+        const cleanText = rawText
+          .toUpperCase()
+          .replace(/\s+/g, "")
+          .replace(/[^A-Z0-9_]/g, "");
 
-      if (extractedCode) {
-        // Show the detected code for user to review/edit
-        setDetectedCode(extractedCode);
-        setShowDetectedCodeInput(true);
-        setErrorMessage("");
-        console.log("✅ Code detected:", extractedCode);
-      } else {
-        setDetectedCode("");
-        setShowDetectedCodeInput(false);
-        setErrorMessage("Could not detect code clearly. Please try again or enter manually.");
-        console.log("❌ No code matched the fuzzy pattern");
+        console.log("🔤 Cleaned text:", cleanText.substring(0, 100));
+
+        // Try to find code with multiple patterns
+        let detectedCode = null;
+
+        // Pattern 1: Strict YMSLB
+        const pattern1 = /YMSLB(?:_W)?_?[A-Z0-9]{3,10}/g;
+        let matches = cleanText.match(pattern1);
+        if (matches && matches.length > 0) {
+          detectedCode = matches[0];
+          console.log("✅ Pattern 1 match:", detectedCode);
+        }
+
+        // Pattern 2: Fuzzy Y M S L B variations
+        if (!detectedCode) {
+          const pattern2 = /YM[5S]L[B8]_?[A-Z0-9]{3,10}/g;
+          matches = cleanText.match(pattern2);
+          if (matches && matches.length > 0) {
+            detectedCode = matches[0];
+            console.log("✅ Pattern 2 match:", detectedCode);
+          }
+        }
+
+        // Pattern 3: Very permissive - just look for code-like structure
+        if (!detectedCode) {
+          const pattern3 = /YMSLB[A-Z0-9_]{4,15}/g;
+          matches = cleanText.match(pattern3);
+          if (matches && matches.length > 0) {
+            detectedCode = matches[0];
+            console.log("✅ Pattern 3 match:", detectedCode);
+          }
+        }
+
+        if (detectedCode) {
+          setDetectedCode(detectedCode);
+          setShowDetectedCodeInput(true);
+          console.log("✅ Code detected:", detectedCode);
+        } else {
+          setErrorMessage(
+            "❌ No confirmation code detected. Please try again, adjust camera angle, or enter manually."
+          );
+          console.log("❌ No code matched any pattern");
+          console.log("📊 Diagnostic info:", {
+            textLength: cleanText.length,
+            sampleText: cleanText.substring(0, 200),
+            hasYM: cleanText.includes("YM"),
+            hasYMSLB: cleanText.includes("YMSLB"),
+          });
+        }
+      } catch (ocrError) {
+        console.error("🔴 Tesseract error:", ocrError);
+        setErrorMessage(
+          "OCR processing failed. Please check browser console for details."
+        );
       }
     } catch (error) {
       setDetectedCode("");
       setShowDetectedCodeInput(false);
-      setErrorMessage("OCR scan failed. Please try again or search manually.");
-      console.error("OCR error:", error);
+      setErrorMessage("Camera capture failed. Please try again.");
+      console.error("Capture error:", error);
     } finally {
       setIsOCRProcessing(false);
     }
@@ -677,10 +699,22 @@ export default function DoorCheckIn({ onLogout }: DoorCheckInProps) {
                               ) : (
                                 <>
                                   <Camera className="w-5 h-5" />
-                                  Manual Scan
+                                  Tap to Scan
                                 </>
                               )}
                             </Button>
+                            
+                            {!isScanning && (
+                              <Button
+                                onClick={() => {
+                                  setIsScanning(true);
+                                  startContinuousScanning();
+                                }}
+                                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-6 py-2 rounded-lg font-semibold shadow-lg transition-all text-sm"
+                              >
+                                Or Auto-Scan
+                              </Button>
+                            )}
                           </div>
                         </div>
                         
